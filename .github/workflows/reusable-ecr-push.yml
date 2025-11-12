@@ -1,0 +1,82 @@
+name: Reusable ECR Push
+
+on:
+  workflow_call:
+    inputs:
+      aws_region:
+        description: 'AWS region'
+        required: false
+        type: string
+        default: 'ap-northeast-2'
+
+jobs:
+  build-and-push:
+    name: Build and Push to ECR
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout service repository
+        uses: actions/checkout@v4
+        with:
+          submodules: ${{ inputs.use_submodules && 'recursive' || 'false' }}
+          path: service
+
+      - name: Checkout platform core repository
+        uses: actions/checkout@v4
+        with:
+          repository: GroomC4/c4ang-platform-core
+          path: workflow-repo
+
+      - name: Get ECR repository name
+        id: ecr-name
+        run: |
+          chmod +x workflow-repo/.github/workflows/get-ecr-repository.sh
+          ECR_REPO=$(workflow-repo/.github/workflows/get-ecr-repository.sh "${{ github.repository }}")
+          echo "ecr_repository=${ECR_REPO}" >> $GITHUB_OUTPUT
+          echo "Mapped GitHub repository '${{ github.repository }}' to ECR repository '${ECR_REPO}'"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract metadata for Docker
+        id: meta
+        run: |
+          TAG_NAME=${{ github.ref_name }}
+
+          # Generate single tag with version name
+          TAGS="${{ steps.login-ecr.outputs.registry }}/${{ steps.ecr-name.outputs.ecr_repository }}:${TAG_NAME}"
+
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./service
+          file: ./service/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Output image details
+        run: |
+          echo "🚀 Docker image pushed successfully!"
+          echo "Repository: ${{ steps.ecr-name.outputs.ecr_repository }}"
+          echo "Tag: ${{ steps.meta.outputs.tag_name }}"
+          echo "Image: ${{ steps.meta.outputs.tags }}"
