@@ -1,4 +1,4 @@
-package com.groom.infra.testcontainers
+package com.groom.platform.testSupport
 
 import org.junit.jupiter.api.Tag
 import org.springframework.test.context.ActiveProfiles

@@ -1,9 +1,9 @@
-package com.groom.infra.testcontainers
+package com.groom.platform.testSupport
 
 import org.junit.jupiter.api.Tag
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
-import org.junit.jupiter.api.extension.ExtendWith
 
 /**
  * K8s 통합 테스트를 위한 어노테이션

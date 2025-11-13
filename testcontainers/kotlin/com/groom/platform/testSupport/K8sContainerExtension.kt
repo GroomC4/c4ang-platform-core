@@ -1,4 +1,4 @@
-package com.groom.infra.testcontainers
+package com.groom.platform.testSupport
 
 import io.fabric8.kubernetes.client.Config
 import io.fabric8.kubernetes.client.KubernetesClientBuilder

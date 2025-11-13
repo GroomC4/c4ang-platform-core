@@ -1,4 +1,4 @@
-package com.groom.infra.testcontainers
+package com.groom.platform.testSupport
 
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Tag
 
 @Tag("e2e-test")
 abstract class E2ETestBase {
-
     companion object {
         @BeforeAll
         @JvmStatic

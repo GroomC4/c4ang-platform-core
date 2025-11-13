@@ -1,4 +1,4 @@
-package com.groom.infra.testcontainers
+package com.groom.platform.testSupport
 
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.ExtensionContext
@@ -22,7 +22,6 @@ import java.time.Duration
  * ```
  */
 abstract class BaseContainerExtension : BeforeAllCallback {
-
     companion object {
         @Volatile
         private var initialized = false
@@ -87,20 +86,21 @@ abstract class BaseContainerExtension : BeforeAllCallback {
         @JvmStatic
         protected fun resolveComposeFile(relativePath: String): File {
             val currentDir = File(System.getProperty("user.dir"))
-            val candidates = listOf(
-                // 직접 지정된 경로
-                File(relativePath),
-                // 현재 디렉토리 기준
-                File(currentDir, relativePath),
-                // 부모 디렉토리 기준 (e-commerce 모듈에서 실행한 경우)
-                File(currentDir.parentFile, relativePath),
-            )
+            val candidates =
+                listOf(
+                    // 직접 지정된 경로
+                    File(relativePath),
+                    // 현재 디렉토리 기준
+                    File(currentDir, relativePath),
+                    // 부모 디렉토리 기준 (e-commerce 모듈에서 실행한 경우)
+                    File(currentDir.parentFile, relativePath),
+                )
 
             return candidates.firstOrNull { it.exists() }
                 ?: throw IllegalStateException(
                     "Docker Compose file not found: $relativePath\n" +
-                    "Current dir: ${currentDir.absolutePath}\n" +
-                    "Searched in: ${candidates.joinToString { it.absolutePath }}"
+                        "Current dir: ${currentDir.absolutePath}\n" +
+                        "Searched in: ${candidates.joinToString { it.absolutePath }}",
                 )
         }
     }
@@ -132,24 +132,22 @@ abstract class BaseContainerExtension : BeforeAllCallback {
                     envVars["SCHEMA_PATH"] = schemaFile.absolutePath
                 }
 
-                composeContainer = DockerComposeContainer(composeFile)
-                    .withExposedService(
-                        POSTGRES_MASTER_SERVICE,
-                        POSTGRES_PORT,
-                        Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(60)),
-                    )
-                    .withExposedService(
-                        POSTGRES_REPLICA_SERVICE,
-                        POSTGRES_PORT,
-                        Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(60)),
-                    )
-                    .withExposedService(
-                        REDIS_SERVICE,
-                        REDIS_PORT,
-                        Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(30)),
-                    )
-                    .withOptions("--compatibility")
-                    .withEnv(envVars)
+                composeContainer =
+                    DockerComposeContainer(composeFile)
+                        .withExposedService(
+                            POSTGRES_MASTER_SERVICE,
+                            POSTGRES_PORT,
+                            Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(60)),
+                        ).withExposedService(
+                            POSTGRES_REPLICA_SERVICE,
+                            POSTGRES_PORT,
+                            Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(60)),
+                        ).withExposedService(
+                            REDIS_SERVICE,
+                            REDIS_PORT,
+                            Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(30)),
+                        ).withOptions("--compatibility")
+                        .withEnv(envVars)
 
                 composeContainer.start()
                 initialized = true

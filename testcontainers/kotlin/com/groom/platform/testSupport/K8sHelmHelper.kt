@@ -1,12 +1,12 @@
-package com.groom.infra.testcontainers
+package com.groom.platform.testSupport
 
+import io.fabric8.kubernetes.api.model.NamespaceBuilder
 import java.io.File
 
 /**
  * K8s 테스트 환경에서 Helm 차트를 배포하는 헬퍼 클래스
  */
 object K8sHelmHelper {
-
     /**
      * 호스트에서 Helm 차트를 K3s 클러스터에 배포합니다.
      * K8sContainerExtension으로 시작된 K3s를 사용합니다.
@@ -31,23 +31,24 @@ object K8sHelmHelper {
                 }
 
             // Helm install 명령 실행
-            val command = buildList {
-                add("helm")
-                add("install")
-                add(releaseName)
-                add(chartPath)
-                add("--kubeconfig")
-                add(kubeconfigFile.absolutePath)
-                add("--namespace")
-                add(namespace)
-                add("--create-namespace")
-                add("--wait")
-                add("--timeout")
-                add("5m")
-                if (values.isNotEmpty()) {
-                    addAll(valuesArgs.split(" "))
+            val command =
+                buildList {
+                    add("helm")
+                    add("install")
+                    add(releaseName)
+                    add(chartPath)
+                    add("--kubeconfig")
+                    add(kubeconfigFile.absolutePath)
+                    add("--namespace")
+                    add(namespace)
+                    add("--create-namespace")
+                    add("--wait")
+                    add("--timeout")
+                    add("5m")
+                    if (values.isNotEmpty()) {
+                        addAll(valuesArgs.split(" "))
+                    }
                 }
-            }
 
             val process =
                 ProcessBuilder(command)
@@ -102,8 +103,7 @@ object K8sHelmHelper {
             client
                 .namespaces()
                 .createOrReplace(
-                    io.fabric8.kubernetes.api.model
-                        .NamespaceBuilder()
+                    NamespaceBuilder()
                         .withNewMetadata()
                         .withName(namespace)
                         .endMetadata()
