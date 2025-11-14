@@ -15,7 +15,7 @@ import java.time.Duration
  * 사용 예시:
  * ```kotlin
  * class StoreServiceContainerExtension : BaseContainerExtension() {
- *     override fun getComposeFile(): File {
+ *     override fun getComposeFile(): File {k
  *         return resolveComposeFile("../c4ang-infra/docker-compose/test/docker-compose-integration-test.yml")
  *     }
  * }
@@ -31,8 +31,10 @@ abstract class BaseContainerExtension : BeforeAllCallback {
         private const val POSTGRES_MASTER_SERVICE = "test-postgres-primary"
         private const val POSTGRES_REPLICA_SERVICE = "test-postgres-replica"
         private const val REDIS_SERVICE = "test-redis"
+        private const val KAFKA_SERVICE = "test-kafka"
         private const val POSTGRES_PORT = 5432
         private const val REDIS_PORT = 6379
+        private const val KAFKA_PORT = 9092
 
         /**
          * Primary 데이터베이스 JDBC URL을 반환합니다.
@@ -72,6 +74,17 @@ abstract class BaseContainerExtension : BeforeAllCallback {
         fun getRedisPort(): Int {
             ensureInitialized()
             return composeContainer.getServicePort(REDIS_SERVICE, REDIS_PORT)
+        }
+
+        /**
+         * Kafka Bootstrap Servers를 반환합니다.
+         */
+        @JvmStatic
+        fun getKafkaBootstrapServers(): String {
+            ensureInitialized()
+            val host = composeContainer.getServiceHost(KAFKA_SERVICE, KAFKA_PORT)
+            val port = composeContainer.getServicePort(KAFKA_SERVICE, KAFKA_PORT)
+            return "$host:$port"
         }
 
         private fun ensureInitialized() {
@@ -146,6 +159,10 @@ abstract class BaseContainerExtension : BeforeAllCallback {
                             REDIS_SERVICE,
                             REDIS_PORT,
                             Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(30)),
+                        ).withExposedService(
+                            KAFKA_SERVICE,
+                            KAFKA_PORT,
+                            Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(90)),
                         ).withOptions("--compatibility")
                         .withEnv(envVars)
 
@@ -164,6 +181,7 @@ abstract class BaseContainerExtension : BeforeAllCallback {
                 println("📍 Primary DB: ${getPrimaryJdbcUrl()}")
                 println("📍 Replica DB: ${getReplicaJdbcUrl()}")
                 println("📍 Redis: ${getRedisHost()}:${getRedisPort()}")
+                println("📍 Kafka: ${getKafkaBootstrapServers()}")
             }
         }
     }
