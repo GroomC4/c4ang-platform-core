@@ -3,23 +3,19 @@ package com.groom.platform.testSupport
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.ExtensionContext
 import org.testcontainers.containers.DockerComposeContainer
+import org.testcontainers.containers.GenericContainer
+import org.testcontainers.containers.KafkaContainer
+import org.testcontainers.containers.Network
 import org.testcontainers.containers.wait.strategy.Wait
+import org.testcontainers.utility.DockerImageName
 import java.io.File
 import java.time.Duration
 
 /**
- * 모든 통합 테스트에서 공유되는 Docker Compose 컨테이너를 관리하는 Base Extension
+ * 모든 통합 테스트에서 공유되는 컨테이너를 관리하는 Base Extension
  *
- * 각 서비스는 이 클래스를 상속받아 자신의 compose 파일 경로를 제공합니다.
- *
- * 사용 예시:
- * ```kotlin
- * class StoreServiceContainerExtension : BaseContainerExtension() {
- *     override fun getComposeFile(): File {k
- *         return resolveComposeFile("../c4ang-infra/docker-compose/test/docker-compose-integration-test.yml")
- *     }
- * }
- * ```
+ * - Docker Compose: PostgreSQL (Primary/Replica), Redis
+ * - TestContainers: Kafka, Schema Registry (동적 포트 지원)
  */
 abstract class BaseContainerExtension : BeforeAllCallback {
     companion object {
@@ -27,14 +23,15 @@ abstract class BaseContainerExtension : BeforeAllCallback {
         private var initialized = false
 
         private lateinit var composeContainer: DockerComposeContainer<*>
+        private lateinit var kafkaContainer: KafkaContainer
+        private lateinit var schemaRegistryContainer: GenericContainer<*>
+        private val network = Network.newNetwork()
 
         private const val POSTGRES_MASTER_SERVICE = "test-postgres-primary"
         private const val POSTGRES_REPLICA_SERVICE = "test-postgres-replica"
         private const val REDIS_SERVICE = "test-redis"
-        private const val KAFKA_SERVICE = "test-kafka"
         private const val POSTGRES_PORT = 5432
         private const val REDIS_PORT = 6379
-        private const val KAFKA_PORT = 9092
 
         /**
          * Primary 데이터베이스 JDBC URL을 반환합니다.
@@ -78,13 +75,21 @@ abstract class BaseContainerExtension : BeforeAllCallback {
 
         /**
          * Kafka Bootstrap Servers를 반환합니다.
+         * TestContainers KafkaContainer가 자동으로 올바른 ADVERTISED_LISTENERS를 설정합니다.
          */
         @JvmStatic
         fun getKafkaBootstrapServers(): String {
             ensureInitialized()
-            val host = composeContainer.getServiceHost(KAFKA_SERVICE, KAFKA_PORT)
-            val port = composeContainer.getServicePort(KAFKA_SERVICE, KAFKA_PORT)
-            return "$host:$port"
+            return kafkaContainer.bootstrapServers
+        }
+
+        /**
+         * Schema Registry URL을 반환합니다.
+         */
+        @JvmStatic
+        fun getSchemaRegistryUrl(): String {
+            ensureInitialized()
+            return "http://${schemaRegistryContainer.host}:${schemaRegistryContainer.getMappedPort(8081)}"
         }
 
         private fun ensureInitialized() {
@@ -132,8 +137,36 @@ abstract class BaseContainerExtension : BeforeAllCallback {
     override fun beforeAll(context: ExtensionContext) {
         synchronized(BaseContainerExtension::class.java) {
             if (!initialized) {
-                println("🚀 Starting shared Docker Compose container for integration tests...")
+                println("🚀 Starting shared containers for integration tests...")
 
+                // 1. Kafka 컨테이너 시작 (TestContainers가 자동으로 ADVERTISED_LISTENERS 설정)
+                println("📦 Starting Kafka container...")
+                kafkaContainer =
+                    KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.1"))
+                        .withNetwork(network)
+                        .withNetworkAliases("kafka")
+                        .withEnv("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "true")
+
+                kafkaContainer.start()
+                println("✅ Kafka started: ${kafkaContainer.bootstrapServers}")
+
+                // 2. Schema Registry 컨테이너 시작
+                println("📦 Starting Schema Registry container...")
+                schemaRegistryContainer =
+                    GenericContainer(DockerImageName.parse("confluentinc/cp-schema-registry:7.5.1"))
+                        .withNetwork(network)
+                        .withExposedPorts(8081)
+                        .withEnv("SCHEMA_REGISTRY_HOST_NAME", "schema-registry")
+                        .withEnv("SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS", "PLAINTEXT://kafka:9092")
+                        .withEnv("SCHEMA_REGISTRY_LISTENERS", "http://0.0.0.0:8081")
+                        .waitingFor(Wait.forHttp("/subjects").forStatusCode(200))
+                        .dependsOn(kafkaContainer)
+
+                schemaRegistryContainer.start()
+                println("✅ Schema Registry started: http://${schemaRegistryContainer.host}:${schemaRegistryContainer.getMappedPort(8081)}")
+
+                // 3. Docker Compose 시작 (PostgreSQL, Redis)
+                println("📦 Starting Docker Compose (PostgreSQL, Redis)...")
                 val composeFile = getComposeFile()
                 val schemaFile = getSchemaFile()
 
@@ -159,10 +192,6 @@ abstract class BaseContainerExtension : BeforeAllCallback {
                             REDIS_SERVICE,
                             REDIS_PORT,
                             Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(30)),
-                        ).withExposedService(
-                            KAFKA_SERVICE,
-                            KAFKA_PORT,
-                            Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(90)),
                         ).withOptions("--compatibility")
                         .withEnv(envVars)
 
@@ -172,16 +201,20 @@ abstract class BaseContainerExtension : BeforeAllCallback {
                 // JVM 종료 시 컨테이너 정리
                 Runtime.getRuntime().addShutdownHook(
                     Thread {
-                        println("🛑 Stopping shared Docker Compose container...")
+                        println("🛑 Stopping shared containers...")
                         composeContainer.stop()
+                        schemaRegistryContainer.stop()
+                        kafkaContainer.stop()
+                        network.close()
                     },
                 )
 
-                println("✅ Shared Docker Compose container started successfully")
+                println("✅ All containers started successfully")
                 println("📍 Primary DB: ${getPrimaryJdbcUrl()}")
                 println("📍 Replica DB: ${getReplicaJdbcUrl()}")
                 println("📍 Redis: ${getRedisHost()}:${getRedisPort()}")
                 println("📍 Kafka: ${getKafkaBootstrapServers()}")
+                println("📍 Schema Registry: ${getSchemaRegistryUrl()}")
             }
         }
     }

@@ -62,49 +62,7 @@ services:
       timeout: 5s
       retries: 5
 
-  test-kafka:
-    image: confluentinc/cp-kafka:7.5.1
-    restart: unless-stopped
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@test-kafka:29093'
-      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://test-kafka:29093'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://test-kafka:9092'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT'
-      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
-      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
-    ports:
-      - "9092"
-    volumes:
-      - test_kafka_data:/var/lib/kafka/data
-
-  test-schema-registry:
-    image: confluentinc/cp-schema-registry:7.5.1
-    restart: unless-stopped
-    depends_on:
-      - test-kafka
-    environment:
-      SCHEMA_REGISTRY_HOST_NAME: test-schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: test-kafka:9092
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1
-    ports:
-      - "8081"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
 volumes:
   test_postgres_primary_data:
   test_postgres_replica_data:
   redis_data:
-  test_kafka_data:
