@@ -2,6 +2,7 @@ package com.groom.platform.testSupport
 
 import org.junit.jupiter.api.Tag
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.ContextConfiguration
 
 /**
  * 통합 테스트를 위한 공통 어노테이션
@@ -22,4 +23,5 @@ import org.springframework.test.context.ActiveProfiles
 @Retention(AnnotationRetention.RUNTIME)
 @Tag("integration-test")
 @ActiveProfiles("test")
+@ContextConfiguration(initializers = [TestContainerContextInitializer::class])
 annotation class IntegrationTest
