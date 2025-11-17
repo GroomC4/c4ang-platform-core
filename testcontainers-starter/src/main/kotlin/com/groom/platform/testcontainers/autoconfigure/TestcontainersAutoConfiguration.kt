@@ -138,4 +138,18 @@ class TestcontainersAutoConfiguration(
         println("📄 Kafka: Using shared singleton container")
         return SharedContainers.kafkaContainer
     }
+
+    /**
+     * Schema Registry 컨테이너 (JVM 전체 공유 싱글톤)
+     *
+     * Kafka Avro 직렬화/역직렬화를 위한 스키마 레지스트리입니다.
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "testcontainers.schema-registry", name = ["enabled"], matchIfMissing = true)
+    fun schemaRegistryContainer(
+        kafkaContainer: KafkaContainer,
+    ): GenericContainer<*> {
+        println("📄 Schema Registry: Using shared singleton container")
+        return SharedContainers.schemaRegistryContainer
+    }
 }

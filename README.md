@@ -24,6 +24,7 @@
 - PostgreSQL (Primary/Replica) Testcontainers 자동 시작
 - Redis Testcontainers 자동 시작
 - Kafka Testcontainers 자동 시작
+- Schema Registry Testcontainers 자동 시작 (Kafka Avro 직렬화 지원)
 - 스키마 파일 자동 로딩
 - **JVM 전역 컨테이너 공유** - 모든 테스트가 동일한 컨테이너 사용 (성능 최적화)
 
@@ -76,6 +77,8 @@ testcontainers:
   redis:
     enabled: true
   kafka:
+    enabled: true
+  schema-registry:
     enabled: true
 ```
 
@@ -160,6 +163,7 @@ c4ang-platform-core/
 - PostgreSQL Primary/Replica 자동 시작
 - Redis 자동 시작
 - Kafka 자동 시작
+- Schema Registry 자동 시작 (Kafka Avro 직렬화 지원)
 - DataSource 자동 구성
 - application-test.yml 기반 설정
 

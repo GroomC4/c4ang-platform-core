@@ -37,6 +37,11 @@ data class TestcontainersProperties(
      * Kafka 설정
      */
     var kafka: KafkaProperties = KafkaProperties(),
+
+    /**
+     * Schema Registry 설정
+     */
+    var schemaRegistry: SchemaRegistryProperties = SchemaRegistryProperties(),
 ) {
     /**
      * PostgreSQL 컨테이너 설정
@@ -136,5 +141,16 @@ data class TestcontainersProperties(
          * 기본값: 빈 리스트
          */
         var topics: List<String> = emptyList(),
+    )
+
+    /**
+     * Schema Registry 컨테이너 설정
+     */
+    data class SchemaRegistryProperties(
+        /**
+         * Schema Registry 컨테이너 활성화 여부
+         * 기본값: true
+         */
+        var enabled: Boolean = true,
     )
 }

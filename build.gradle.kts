@@ -8,7 +8,7 @@ plugins {
 
 allprojects {
     group = "com.groom.platform"
-    version = "1.2.0"
+    version = "1.2.1"
 
     repositories {
         mavenCentral()
@@ -27,7 +27,6 @@ subprojects {
 
     dependencies {
         val implementation by configurations
-        val testImplementation by configurations
 
         // Kotlin
         implementation("org.jetbrains.kotlin:kotlin-reflect")
