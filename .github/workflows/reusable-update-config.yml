@@ -29,12 +29,6 @@ jobs:
     # 여기서는 workflow_call 레벨에서 받은 permissions를 사용합니다.
 
     steps:
-      - name: Set Variables
-        run: |
-          # SERVICE_NAME (예: customer) 추출
-          SERVICE_NAME=$(echo ${{ inputs.service_slug }} | sed 's/-service//')
-          echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_ENV
-
       - name: Install yq
         uses: mikefarah/yq@v4
 
@@ -58,11 +52,12 @@ jobs:
           echo "Updating file: $VALUES_FILE with tag: $NEW_TAG"
           
           # yq를 사용하여 'image.tag' 필드 업데이트
-          yq e ".image.tag = \"$NEW_TAG\"" -i $VALUES_FILE
+          yq -i --arg tag "$NEW_TAG" '.image.tag = $tag' "$VALUES_FILE"
+
 
       - name: Commit and Push changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           repository: config-repo
-          commit_message: "chore(cd): Update ${{ env.SERVICE_NAME }} image to ${{ inputs.image_tag }} [skip ci]"
+          commit_message: "chore(cd): Update ${{ inputs.service_slug }} image to ${{ inputs.image_tag }} [skip ci]"
           branch: main
