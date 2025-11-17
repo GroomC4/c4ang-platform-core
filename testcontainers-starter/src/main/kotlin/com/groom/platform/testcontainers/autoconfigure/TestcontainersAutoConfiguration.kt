@@ -56,7 +56,6 @@ import org.testcontainers.containers.PostgreSQLContainer
  * }
  * ```
  */
-@TestConfiguration
 @AutoConfiguration
 @ConditionalOnClass(PostgreSQLContainer::class)
 @EnableConfigurationProperties(TestcontainersProperties::class)
@@ -77,12 +76,18 @@ class TestcontainersAutoConfiguration(
         val container = SharedContainers.postgresContainer
 
         // 스키마 파일 자동 로딩 (이미 시작된 컨테이너인 경우 스킵)
-        postgres.schemaLocation?.let { schemaPath ->
-            if (!container.isRunning) {
+        if (!container.isRunning) {
+            postgres.schemaLocation?.let { schemaPath ->
                 val cleanPath = schemaPath.removePrefix("classpath:").removePrefix("file:")
                 container.withInitScript(cleanPath)
+                println("📄 PostgreSQL Primary: Schema location configured as $schemaPath")
             }
-            println("📄 PostgreSQL Primary: Schema location configured as $schemaPath")
+
+            // 컨테이너 시작
+            container.start()
+            println("✅ PostgreSQL Primary container started and ready (${container.jdbcUrl})")
+        } else {
+            println("✅ PostgreSQL Primary container already running (${container.jdbcUrl})")
         }
 
         return container
@@ -108,14 +113,20 @@ class TestcontainersAutoConfiguration(
         val container = SharedContainers.postgresReplicaContainer
 
         // 스키마 파일 자동 로딩 (이미 시작된 컨테이너인 경우 스킵)
-        postgres.schemaLocation?.let { schemaPath ->
-            if (!container.isRunning) {
+        if (!container.isRunning) {
+            postgres.schemaLocation?.let { schemaPath ->
                 val cleanPath = schemaPath.removePrefix("classpath:").removePrefix("file:")
                 container.withInitScript(cleanPath)
+                println("📄 PostgreSQL Replica: Schema location configured as $schemaPath")
             }
+
+            // 컨테이너 시작
+            container.start()
+            println("✅ PostgreSQL Replica container started and ready (${container.jdbcUrl})")
+        } else {
+            println("✅ PostgreSQL Replica container already running (${container.jdbcUrl})")
         }
 
-        println("📄 PostgreSQL Replica: Using shared singleton container")
         return container
     }
 

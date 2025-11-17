@@ -51,8 +51,10 @@ import javax.sql.DataSource
  * }
  * ```
  */
-@TestConfiguration
-@AutoConfiguration(before = [DataSourceAutoConfiguration::class])
+@AutoConfiguration(
+    before = [DataSourceAutoConfiguration::class],
+    after = [TestcontainersAutoConfiguration::class],
+)
 @ConditionalOnClass(PostgreSQLContainer::class)
 @Profile("test")
 class TestDataSourceAutoConfiguration {

@@ -28,16 +28,14 @@ object SharedContainers {
      * lazy 초기화: 처음 사용될 때 한 번만 시작됩니다.
      */
     val postgresContainer: PostgreSQLContainer<*> by lazy {
-        println("🚀 Starting shared PostgreSQL Primary container...")
+        println("🚀 Initializing shared PostgreSQL Primary container...")
         PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
             .withDatabaseName("testdb")
             .withUsername("test")
             .withPassword("test")
             .withReuse(true)
-            .apply {
-                start()
-                println("✅ PostgreSQL Primary container started and ready (${this.jdbcUrl})")
-            }
+            // Note: Do NOT call start() here!
+            // The container will be started after schema configuration in TestcontainersAutoConfiguration
     }
 
     /**
@@ -47,16 +45,14 @@ object SharedContainers {
      * 별도의 독립적인 PostgreSQL 인스턴스를 Replica로 사용합니다.
      */
     val postgresReplicaContainer: PostgreSQLContainer<*> by lazy {
-        println("🚀 Starting shared PostgreSQL Replica container...")
+        println("🚀 Initializing shared PostgreSQL Replica container...")
         PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
             .withDatabaseName("testdb")
             .withUsername("test")
             .withPassword("test")
             .withReuse(true)
-            .apply {
-                start()
-                println("✅ PostgreSQL Replica container started and ready (${this.jdbcUrl})")
-            }
+            // Note: Do NOT call start() here!
+            // The container will be started after schema configuration in TestcontainersAutoConfiguration
     }
 
     /**
