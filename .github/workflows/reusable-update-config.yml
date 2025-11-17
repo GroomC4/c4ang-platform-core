@@ -15,10 +15,6 @@ on:
         description: 'The name of the infrastructure repository'
         required: true
         type: string
-    secrets:
-      inherit: true
-    permissions:
-      contents: write # Infra Repo에 커밋할 권한
 
 jobs:
   update-and-commit:
