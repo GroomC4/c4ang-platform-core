@@ -4,14 +4,13 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
     paths:
       - 'datasource-starter/**'
       - 'testcontainers-starter/**'
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
-  push:
-    tags:
-      - 'v*'
   release:
     types: [published]
   workflow_dispatch:
