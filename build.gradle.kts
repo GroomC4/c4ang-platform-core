@@ -8,7 +8,10 @@ plugins {
 
 allprojects {
     group = "com.groom.platform"
-    version = "1.2.1"
+    // Tag 이름으로 버전 설정 (예: v1.2.0 → 1.2.0)
+    // GitHub Actions에서 -Pversion=1.2.0 형태로 전달
+    // 로컬 개발 시에는 기본값 사용
+    version = project.findProperty("version") as String? ?: "1.2.1-SNAPSHOT"
 
     repositories {
         mavenCentral()
