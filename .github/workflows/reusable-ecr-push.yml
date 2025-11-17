@@ -8,11 +8,18 @@ on:
         required: false
         type: string
         default: 'ap-northeast-2'
+    outputs: # 메인 워크플로우(CI.yml)로 전달할 최종 Output
+      image_tag:
+        description: 'The tag of the built Docker image (e.g., v1.0.0)'
+        value: ${{ jobs.build-and-push.outputs.tag_name }} # job output인 tag_name을 참조
 
 jobs:
   build-and-push:
     name: Build and Push to ECR
     runs-on: ubuntu-latest
+
+    outputs: # Job 내부에서 외부로 전달할 Output 정의
+      tag_name: ${{ steps.meta.outputs.tag_name }}
 
     permissions:
       id-token: write
@@ -58,7 +65,7 @@ jobs:
           TAGS="${{ steps.login-ecr.outputs.registry }}/${{ steps.ecr-name.outputs.ecr_repository }}:${TAG_NAME}"
 
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
-          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT # tag_name을 step output으로 설정
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -80,3 +87,20 @@ jobs:
           echo "Repository: ${{ steps.ecr-name.outputs.ecr_repository }}"
           echo "Tag: ${{ steps.meta.outputs.tag_name }}"
           echo "Image: ${{ steps.meta.outputs.tags }}"
+
+  call-update-config:
+    name: Trigger CD (Call Update Config)
+    needs: build-and-push # 1번 Job(build-and-push)이 성공해야 실행
+
+    permissions:
+      contents: write # c4ang-infra에 커밋할 권한
+
+    secrets: inherit # GROOM_GITHUB_ACTION_TOKEN 전달
+
+    # 1번 Job이 끝난 후, 2번 Job은 reusable-update-config.yml을 호출
+    uses: GroomC4/c4ang-platform-core/.github/workflows/reusable-update-config.yml@v1.2.1-RC
+    with:
+      # 1번 Job(build-and-push)의 결과(outputs)를 전달
+      service_slug: "${{ github.repository }}"
+      image_tag: ${{ needs.build-and-push.outputs.tag_name }}
+      infra_repo_name: 'GroomC4/c4ang-infra'
