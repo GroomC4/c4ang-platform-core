@@ -87,3 +87,19 @@ jobs:
           echo "Repository: ${{ steps.ecr-name.outputs.ecr_repository }}"
           echo "Tag: ${{ steps.meta.outputs.tag_name }}"
           echo "Image: ${{ steps.meta.outputs.tags }}"
+
+  call-update-config:
+    name: Trigger CD (Call Update Config)
+    needs: build-and-push # 1번 Job(build-and-push)이 성공해야 실행
+
+    permissions:
+      contents: write # c4ang-infra에 커밋할 권한
+
+    secrets: inherit # GROOM_GITHUB_ACTION_TOKEN 전달
+
+    # 1번 Job이 끝난 후, 2번 Job은 reusable-update-config.yml을 호출
+    uses: GroomC4/c4ang-platform-core/.github/workflows/reusable-update-config.yml@main
+    with:
+      # 1번 Job(build-and-push)의 결과(outputs)를 전달
+      image_tag: ${{ needs.build-and-push.outputs.tag_name }}
+      infra_repo_name: ${{ inputs.infra_repo_name }}
