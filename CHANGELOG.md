@@ -64,6 +64,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.2-RC4] - 2024-11-18
+
+### Fixed
+- 🐛 @Profile("test") 제거로 test profile 미활성화 시에도 DataSource Bean 생성되도록 수정
+- ✨ testImplementation 의존성만으로 자동 작동 (profile 설정 불필요)
+
+## [1.2.2-RC3] - 2024-11-18
+
+### Changed
+- 🔧 Schema Registry를 Kafka와 동일 네트워크로 이동
+
+## [1.2.2-RC2] - 2024-11-18
+
+### Added
+- ✨ `datasource-core`: 공통 DataSource 클래스 모듈 신규 생성
+  - DynamicRoutingDataSource, DataSourceType 분리
+
+### Fixed
+- 🐛 DataSource Bean 순환 참조 문제 해결
+  - testcontainers-starter가 datasource-starter 대신 datasource-core 의존
+  - AutoConfiguration 충돌 완전 제거
+
+## [1.2.2-RC1] - 2024-11-18
+
+### Added
+- ✨ Schema Registry Testcontainer 지원 추가
+  - Kafka Avro 직렬화/역직렬화 자동 구성
+  - testcontainers.schema-registry.enabled 설정 지원
+
+### Changed
+- 🔧 Git tag 기반 버전 관리로 변경 (v1.2.0 → 1.2.0)
+
+### Fixed
+- 🐛 @Profile("!test") 추가로 순환 참조 시도 (미해결)
+
+---
+
 ## [Unreleased]
 
 ### Planned
