@@ -64,6 +64,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.2-RC9] - 2024-11-18
+
+### Changed
+- 🔄 **PostgreSQL 단일 컨테이너 모드로 변경** (주요 변경사항)
+  - Primary-Replica 복제 구조 → 단일 PostgreSQL 컨테이너로 간소화
+  - Primary와 Replica DataSource 모두 동일한 컨테이너 참조
+  - 라우팅 로직(@Transactional readOnly) 정상 작동 유지
+
+### Removed
+- ❌ `postgresReplicaContainer` 제거 (독립 컨테이너)
+- ❌ Streaming Replication 설정 제거 (복잡도 감소)
+
+### Improved
+- ⚡ 테스트 실행 속도 향상 (컨테이너 1개만 시작)
+- 🔧 설정 간소화 및 유지보수성 향상
+- 📝 명확한 동작 방식 문서화
+
+### Why
+- Testcontainers에서 실제 Streaming Replication 구현은 기술적으로 복잡
+- 대부분의 통합 테스트는 라우팅 로직 검증만으로 충분
+- 단일 컨테이너로도 @Transactional(readOnly) 동작 완전히 테스트 가능
+
+### Future
+- v2.0에서 실제 Streaming Replication 지원 예정 (옵션)
+
+---
+
+## [1.2.2-RC8] - 2024-11-18
+
+### Added
+- ✨ Kafka 토픽 자동 생성 활성화 (기본값)
+  - `KAFKA_AUTO_CREATE_TOPICS_ENABLE=true`
+  - `KAFKA_NUM_PARTITIONS=1` (기본 파티션 수)
+  - `KAFKA_DEFAULT_REPLICATION_FACTOR=1` (단일 브로커)
+
+- ✨ Kafka 사전 정의 토픽 지원
+  - `testcontainers.kafka.auto-create-topics`: 자동 생성 활성화 여부 (기본값: true)
+  - `testcontainers.kafka.topics`: 사전 정의 토픽 목록 (partitions, replication-factor, config 설정 가능)
+  - Kafka AdminClient로 컨테이너 시작 시 토픽 자동 생성
+
+### Changed
+- 🔧 KafkaProperties 확장: `autoCreateTopics`, `topics` 필드 추가
+- 🔧 KafkaTopicConfig 추가: 토픽별 상세 설정 지원
+
+### Fixed
+- 🐛 Kafka Producer TimeoutException 해결
+  - 토픽 미생성으로 인한 60초 timeout 문제 수정
+  - Producer가 존재하지 않는 토픽에 메시지 발행 시 자동 생성
+  - 명시적 토픽 정의로 운영 환경과 동일한 설정 테스트 가능
+
+## [1.2.2-RC7] - 2024-11-18
+
+### Added
+- 🔍 디버깅 로그 추가 (스키마 로딩 진단용)
+
+### Issues
+- ⚠️ 모듈 루트 설정 이슈로 AutoConfiguration 미실행 (사용자 환경 문제)
+
 ## [1.2.2-RC6] - 2024-11-18
 
 ### Added

@@ -129,67 +129,38 @@ class TestcontainersAutoConfiguration(
     }
 
     /**
-     * PostgreSQL Replica 컨테이너 (JVM 전체 공유 싱글톤)
+     * PostgreSQL Replica 컨테이너 Bean
      *
-     * replica-enabled=false인 경우 Primary 컨테이너를 반환합니다.
-     * 이렇게 하면 라우팅 로직은 작동하지만 실제로는 같은 DB를 사용합니다.
+     * **단일 컨테이너 모드:**
+     * - replica-enabled 설정과 관계없이 항상 Primary 컨테이너를 반환
+     * - Primary와 Replica DataSource가 동일한 PostgreSQL 인스턴스를 참조
+     * - 라우팅 로직은 정상 작동하지만 물리적으로는 같은 DB 사용
+     *
+     * **장점:**
+     * - 빠른 테스트 실행 (컨테이너 1개만)
+     * - 설정 간소화
+     * - @Transactional(readOnly) 라우팅 로직 테스트 가능
+     *
+     * **이유:**
+     * - Testcontainers 환경에서 실제 Streaming Replication 구현은 복잡함
+     * - 대부분의 통합 테스트는 라우팅 로직만 검증하면 충분
+     * - 실제 복제 지연(lag)이나 failover 테스트가 필요한 경우는 드뭄
+     *
+     * **향후 계획:**
+     * - v2.0에서 실제 Streaming Replication 지원 예정
+     * - 옵션으로 선택 가능하도록 구현 (streaming-replication: true)
      */
     @Bean
     @ConditionalOnProperty(prefix = "testcontainers.postgres", name = ["replica-enabled"], matchIfMissing = true)
     fun postgresReplicaContainer(
         postgresContainer: PostgreSQLContainer<*>,
     ): PostgreSQLContainer<*> {
-        if (!properties.postgres.replicaEnabled) {
-            println("⚠️  PostgreSQL Replica disabled, using Primary for both MASTER and REPLICA")
-            return postgresContainer
-        }
+        println("📄 PostgreSQL Replica: Using same container as Primary (single container mode)")
+        println("   - Both MASTER and REPLICA DataSources will point to the same PostgreSQL instance")
+        println("   - Routing logic will work, but physically using one database")
+        println("   - This is sufficient for testing routing behavior")
 
-        val postgres = properties.postgres
-        val container = SharedContainers.postgresReplicaContainer
-
-        // 스키마 파일 자동 로딩 (이미 시작된 컨테이너인 경우 스킵)
-        if (!container.isRunning) {
-            postgres.schemaLocation?.let { schemaPath ->
-                when {
-                    schemaPath.startsWith("project:") -> {
-                        // project: 프로토콜 - 프로젝트 루트 기준 상대 경로
-                        val relativePath = schemaPath.removePrefix("project:")
-                        val absolutePath = java.io.File(System.getProperty("user.dir"), relativePath).absolutePath
-
-                        val mountableFile = org.testcontainers.utility.MountableFile.forHostPath(absolutePath)
-                        container.withCopyFileToContainer(
-                            mountableFile,
-                            "/docker-entrypoint-initdb.d/init-schema.sql"
-                        )
-                        println("📄 PostgreSQL Replica: Schema loaded from project: $absolutePath")
-                    }
-                    schemaPath.startsWith("file:") -> {
-                        // file: 프로토콜 - 파일 시스템 절대 경로
-                        val filePath = schemaPath.removePrefix("file:")
-                        val mountableFile = org.testcontainers.utility.MountableFile.forHostPath(filePath)
-                        container.withCopyFileToContainer(
-                            mountableFile,
-                            "/docker-entrypoint-initdb.d/init-schema.sql"
-                        )
-                        println("📄 PostgreSQL Replica: Schema loaded from file: $filePath")
-                    }
-                    else -> {
-                        // classpath: 프로토콜 또는 프로토콜 없음 - classpath 리소스에서 읽음
-                        val cleanPath = schemaPath.removePrefix("classpath:")
-                        container.withInitScript(cleanPath)
-                        println("📄 PostgreSQL Replica: Schema loaded from classpath: $cleanPath")
-                    }
-                }
-            }
-
-            // 컨테이너 시작
-            container.start()
-            println("✅ PostgreSQL Replica container started and ready (${container.jdbcUrl})")
-        } else {
-            println("✅ PostgreSQL Replica container already running (${container.jdbcUrl})")
-        }
-
-        return container
+        return postgresContainer
     }
 
     /**
@@ -204,12 +175,68 @@ class TestcontainersAutoConfiguration(
 
     /**
      * Kafka 컨테이너 (JVM 전체 공유 싱글톤)
+     *
+     * **자동 토픽 생성 지원:**
+     * - autoCreateTopics=true: Producer가 없는 토픽에 메시지 보낼 때 자동 생성
+     * - topics 리스트: 사전 정의 토픽을 컨테이너 시작 시 생성
      */
     @Bean
     @ConditionalOnProperty(prefix = "testcontainers.kafka", name = ["enabled"], matchIfMissing = true)
     fun kafkaContainer(): KafkaContainer {
         println("📄 Kafka: Using shared singleton container")
-        return SharedContainers.kafkaContainer
+        val container = SharedContainers.kafkaContainer
+
+        // 사전 정의 토픽 생성
+        if (properties.kafka.topics.isNotEmpty()) {
+            createPredefinedTopics(container, properties.kafka.topics)
+        }
+
+        return container
+    }
+
+    /**
+     * Kafka AdminClient를 사용하여 사전 정의된 토픽을 생성합니다.
+     *
+     * @param kafkaContainer Kafka 컨테이너
+     * @param topics 생성할 토픽 목록
+     */
+    private fun createPredefinedTopics(
+        kafkaContainer: KafkaContainer,
+        topics: List<TestcontainersProperties.KafkaTopicConfig>,
+    ) {
+        val adminClient = org.apache.kafka.clients.admin.AdminClient.create(
+            mapOf(
+                org.apache.kafka.clients.admin.AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG to kafkaContainer.bootstrapServers
+            )
+        )
+
+        try {
+            val newTopics = topics.map { topic ->
+                org.apache.kafka.clients.admin.NewTopic(
+                    topic.name,
+                    topic.partitions,
+                    topic.replicationFactor
+                ).configs(topic.config)
+            }
+
+            adminClient.createTopics(newTopics).all().get(30, java.util.concurrent.TimeUnit.SECONDS)
+
+            println("✅ Kafka predefined topics created:")
+            topics.forEach { topic ->
+                println("   - ${topic.name} (partitions=${topic.partitions}, replication-factor=${topic.replicationFactor})")
+            }
+        } catch (e: Exception) {
+            when (e) {
+                is org.apache.kafka.common.errors.TopicExistsException -> {
+                    println("⚠️  Some topics already exist, skipping...")
+                }
+                else -> {
+                    println("⚠️  Failed to create predefined topics: ${e.message}")
+                }
+            }
+        } finally {
+            adminClient.close()
+        }
     }
 
     /**

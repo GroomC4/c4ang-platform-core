@@ -260,10 +260,19 @@ testcontainers:
 
   kafka:
     enabled: true                           # Kafka 컨테이너 활성화
-    topics:                                 # 자동 생성할 토픽
-      - order-events
-      - payment-events
-      - notification-events
+    auto-create-topics: true                # 토픽 자동 생성 활성화 (기본값, 생략 가능)
+    topics:                                 # 사전 정의 토픽 (선택사항)
+      - name: order.created
+        partitions: 3                       # 파티션 수
+        replication-factor: 1               # 복제 계수 (Testcontainers는 1만 가능)
+        config:
+          retention.ms: 604800000           # 7일 보관
+      - name: payment.processed
+        partitions: 1
+        replication-factor: 1
+      - name: notification.sent
+        partitions: 2
+        replication-factor: 1
 
 # JPA 설정
 spring:
@@ -449,7 +458,7 @@ class KafkaProducerTest {
     @Test
     fun `Kafka 메시지 발행 테스트`() {
         // Given
-        val topic = "order-events"
+        val topic = "order.created"
         val message = "Order created: 12345"
 
         // When
@@ -460,6 +469,135 @@ class KafkaProducerTest {
         assert(result.recordMetadata.topic() == topic)
     }
 }
+```
+
+### 4. Kafka 토픽 설정 상세
+
+RC8부터 Kafka 토픽 설정이 대폭 강화되었습니다.
+
+#### 옵션 1: 자동 생성만 사용 (가장 간단)
+
+```yaml
+testcontainers:
+  kafka:
+    enabled: true
+    # auto-create-topics: true (기본값)
+    # Producer가 존재하지 않는 토픽에 메시지를 보내면 자동으로 생성됩니다.
+```
+
+**장점:**
+- 설정 불필요
+- 테스트마다 다른 토픽 사용 가능
+- 빠른 프로토타이핑
+
+**단점:**
+- 토픽 설정 제어 불가 (파티션=1, replication-factor=1 고정)
+
+#### 옵션 2: 사전 정의 토픽 사용 (권장)
+
+```yaml
+testcontainers:
+  kafka:
+    enabled: true
+    auto-create-topics: true  # 기본값, 생략 가능
+    topics:
+      - name: order.created
+        partitions: 3
+        replication-factor: 1
+        config:
+          retention.ms: 604800000    # 7일 보관
+          max.message.bytes: 1048576 # 1MB
+          compression.type: gzip     # 압축 방식
+```
+
+**장점:**
+- 중요 토픽은 운영 환경과 동일하게 설정
+- 예상치 못한 토픽은 자동 생성 (백업)
+- 토픽별 상세 설정 가능
+
+**사용 예시:**
+```yaml
+testcontainers:
+  kafka:
+    enabled: true
+    topics:
+      # 주문 이벤트 - 높은 처리량
+      - name: order.created
+        partitions: 6
+        replication-factor: 1
+
+      # 결제 이벤트 - 순서 보장 중요
+      - name: payment.processed
+        partitions: 1
+        replication-factor: 1
+        config:
+          retention.ms: 2592000000  # 30일
+
+      # 알림 이벤트 - 일시적 데이터
+      - name: notification.sent
+        partitions: 3
+        replication-factor: 1
+        config:
+          retention.ms: 86400000    # 1일
+```
+
+#### 옵션 3: 엄격한 제어 (운영 환경 시뮬레이션)
+
+```yaml
+testcontainers:
+  kafka:
+    enabled: true
+    auto-create-topics: false  # 자동 생성 비활성화
+    topics:
+      - name: order.created
+        partitions: 3
+        replication-factor: 1
+      - name: payment.processed
+        partitions: 1
+        replication-factor: 1
+    # 목록에 없는 토픽 사용 시 TimeoutException 발생
+    # → 운영 환경과 동일한 제약 조건 테스트
+```
+
+**장점:**
+- 운영 환경과 동일한 토픽 정책
+- 잘못된 토픽 사용 방지
+
+**단점:**
+- 모든 토픽을 명시해야 함
+- 토픽 누락 시 테스트 실패
+
+#### Kafka 토픽 설정 옵션
+
+| 설정 | 설명 | 기본값 | 예시 |
+|-----|------|-------|-----|
+| `retention.ms` | 메시지 보관 시간 (밀리초) | 604800000 (7일) | 86400000 (1일) |
+| `retention.bytes` | 파티션당 최대 크기 (바이트) | -1 (무제한) | 1073741824 (1GB) |
+| `max.message.bytes` | 최대 메시지 크기 (바이트) | 1048576 (1MB) | 10485760 (10MB) |
+| `compression.type` | 압축 방식 | producer | gzip, snappy, lz4, zstd |
+| `cleanup.policy` | 정리 정책 | delete | delete, compact |
+
+#### 실전 예시: Store API
+
+```yaml
+# store-api/src/test/resources/application-test.yml
+testcontainers:
+  postgres:
+    enabled: true
+    replica-enabled: true
+    schema-location: project:store-api/sql/schema.sql
+
+  kafka:
+    enabled: true
+    topics:
+      - name: store.info.updated
+        partitions: 3
+        replication-factor: 1
+        config:
+          retention.ms: 604800000  # 7일
+      - name: store.deleted
+        partitions: 1
+        replication-factor: 1
 ```
 
 ### 2. 테스트 실행

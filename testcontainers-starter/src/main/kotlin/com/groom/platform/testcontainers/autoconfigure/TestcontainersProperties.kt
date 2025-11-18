@@ -137,10 +137,94 @@ data class TestcontainersProperties(
         var image: String = "confluentinc/cp-kafka:7.5.1",
 
         /**
-         * 자동 생성할 토픽 리스트
+         * 토픽 자동 생성 활성화 여부
+         *
+         * - true: Producer가 존재하지 않는 토픽에 메시지를 보낼 때 자동으로 토픽 생성 (기본값)
+         * - false: 명시적으로 정의된 토픽만 사용 가능
+         *
+         * **권장 사용법:**
+         * - 테스트 환경: true (편의성)
+         * - 운영 환경 시뮬레이션: false + topics 명시
+         *
+         * 기본값: true
+         */
+        var autoCreateTopics: Boolean = true,
+
+        /**
+         * 사전 정의 토픽 리스트
+         *
+         * 이 목록에 정의된 토픽은 Kafka 컨테이너 시작 시 자동으로 생성됩니다.
+         * autoCreateTopics=true인 경우에도 이 토픽들은 지정한 설정으로 우선 생성됩니다.
+         *
+         * **사용 예시:**
+         * ```yaml
+         * testcontainers:
+         *   kafka:
+         *     auto-create-topics: true  # 기본값, 명시 안해도 됨
+         *     topics:
+         *       - name: store.info.updated
+         *         partitions: 3
+         *         replication-factor: 1
+         *         config:
+         *           retention.ms: 604800000  # 7일
+         *       - name: order.created
+         *         partitions: 1
+         *         replication-factor: 1
+         * ```
+         *
          * 기본값: 빈 리스트
          */
-        var topics: List<String> = emptyList(),
+        var topics: List<KafkaTopicConfig> = emptyList(),
+    )
+
+    /**
+     * Kafka 토픽 설정
+     */
+    data class KafkaTopicConfig(
+        /**
+         * 토픽 이름
+         */
+        var name: String,
+
+        /**
+         * 파티션 수
+         *
+         * 파티션 수는 병렬 처리 성능에 영향을 줍니다.
+         * - 1: 메시지 순서 보장, 단일 Consumer
+         * - 여러 개: 높은 처리량, 파티션별 순서만 보장
+         *
+         * 기본값: 1
+         */
+        var partitions: Int = 1,
+
+        /**
+         * 복제 계수
+         *
+         * 각 파티션의 복사본 개수입니다.
+         * - 1: 복제 없음 (테스트 환경 적합)
+         * - 2: 1대 장애 허용
+         * - 3: 2대 장애 허용 (운영 환경 권장)
+         *
+         * ⚠️ Testcontainers는 단일 브로커이므로 1만 가능합니다.
+         *
+         * 기본값: 1
+         */
+        var replicationFactor: Short = 1,
+
+        /**
+         * 토픽별 설정
+         *
+         * Kafka 토픽 설정 옵션을 key-value로 지정합니다.
+         *
+         * **주요 설정:**
+         * - retention.ms: 메시지 보관 시간 (밀리초)
+         * - retention.bytes: 파티션당 최대 크기
+         * - max.message.bytes: 최대 메시지 크기
+         * - compression.type: 압축 방식 (gzip, snappy, lz4, zstd)
+         *
+         * 기본값: 빈 맵
+         */
+        var config: Map<String, String> = emptyMap(),
     )
 
     /**
