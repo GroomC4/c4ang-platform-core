@@ -64,6 +64,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.2-RC5] - 2024-11-18
+
+### Added
+- ✨ `file:` 프로토콜 지원으로 호스트 파일 시스템의 스키마 파일 로딩 가능
+  - `file:sql/schema.sql` (프로젝트 루트 기준 상대 경로)
+  - `file:/absolute/path/schema.sql` (절대 경로)
+  - 기존 `classpath:` 프로토콜도 계속 지원
+
+### Changed
+- 🔧 스키마 로딩 로직 개선: MountableFile 사용으로 파일 시스템 직접 접근
+
 ## [1.2.2-RC4] - 2024-11-18
 
 ### Fixed
