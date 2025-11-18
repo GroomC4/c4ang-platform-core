@@ -73,12 +73,16 @@ dependencies {
 ```kotlin
 package com.groom.yourservice.common
 
+import com.groom.platform.testcontainers.annotation.IntegrationTest
 import org.springframework.boot.test.context.SpringBootTest
 
 /**
  * ⚠️ 이 클래스만으로 모든 설정 완료!
- * @ActiveProfiles 없음 = application-test.yml과 중복 방지
+ *
+ * @IntegrationTest: Kafka/Schema Registry 동적 포트 자동 주입
+ * @SpringBootTest properties: 컨테이너 설정
  */
+@IntegrationTest
 @SpringBootTest(
     properties = [
         "testcontainers.postgres.enabled=true",

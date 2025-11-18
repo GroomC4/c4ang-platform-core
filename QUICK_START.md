@@ -44,12 +44,16 @@ dependencies {
 ```kotlin
 package com.groom.yourservice.common
 
+import com.groom.platform.testcontainers.annotation.IntegrationTest
 import org.springframework.boot.test.context.SpringBootTest
 
 /**
  * ⚠️ 중요: 이 클래스만으로 모든 설정 완료!
- * @ActiveProfiles를 사용하지 않아 application-test.yml과 중복 설정 방지
+ *
+ * @IntegrationTest: Kafka/Schema Registry 동적 포트 자동 주입 (필수!)
+ * @SpringBootTest properties: 컨테이너 설정
  */
+@IntegrationTest
 @SpringBootTest(
     properties = [
         // PostgreSQL
@@ -78,6 +82,12 @@ abstract class IntegrationTestBase
 
 1. `sql/schema.sql` → 실제 스키마 파일 경로 (모듈 내 위치)
 2. `your.topic.name` → 실제 Kafka 토픽 이름
+
+**💡 @IntegrationTest 어노테이션의 역할:**
+- **Kafka 동적 포트 주입**: Testcontainers가 할당한 랜덤 포트를 자동으로 `spring.kafka.bootstrap-servers`에 설정
+- **Schema Registry 동적 포트 주입**: 자동으로 `kafka.schema-registry.url`에 설정
+- **없으면**: Kafka/Schema Registry 연결 실패 (포트 불일치)
+- **결론**: `@IntegrationTest` 어노테이션은 **필수**입니다!
 
 ---
 

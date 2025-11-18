@@ -166,19 +166,18 @@ dependencies {
 ```kotlin
 package com.groom.yourservice.common
 
+import com.groom.platform.testcontainers.annotation.IntegrationTest
 import org.springframework.boot.test.context.SpringBootTest
 
 /**
  * 모든 통합 테스트가 상속받을 Base 클래스
  *
  * ⚠️ 중요: 이 클래스만으로 모든 설정이 완료됩니다.
- * application-test.yml이 없어도 작동합니다.
  *
- * @ActiveProfiles를 사용하지 않는 이유:
- * - @SpringBootTest properties로 모든 설정을 명시적으로 제공
- * - application-test.yml과 중복 설정 방지
- * - 설정이 한 곳에만 있어 명확함
+ * @IntegrationTest: Kafka/Schema Registry 동적 포트 자동 주입 (필수!)
+ * @SpringBootTest properties: 컨테이너 설정
  */
+@IntegrationTest
 @SpringBootTest(
     properties = [
         // ===== PostgreSQL 설정 =====
@@ -218,13 +217,19 @@ abstract class IntegrationTestBase
 
 **⚠️ 주의사항:**
 
-1. **스키마 파일 경로는 프로젝트에 맞게 수정하세요**
+1. **@IntegrationTest 어노테이션은 필수입니다!**
+   - **역할**: Kafka/Schema Registry의 동적 포트를 자동으로 주입
+   - **동작**: Testcontainers가 할당한 랜덤 포트(예: 34717)를 `spring.kafka.bootstrap-servers`에 자동 설정
+   - **없으면**: 고정 포트(9092)를 사용하려다가 연결 실패
+   - **중앙화**: testcontainers-starter에 포함되어 있으므로 import만 하면 됨
+
+2. **스키마 파일 경로는 프로젝트에 맞게 수정하세요**
    - `project:sql/schema.sql` (권장 - 자동 경로 탐색)
    - 또는 `classpath:db/schema.sql`, `file:/absolute/path`
 
-2. **Kafka 토픽은 실제 사용하는 토픽으로 변경하세요**
+3. **Kafka 토픽은 실제 사용하는 토픽으로 변경하세요**
 
-3. **필요 없는 인프라는 `enabled=false`로 비활성화하세요**
+4. **필요 없는 인프라는 `enabled=false`로 비활성화하세요**
    ```kotlin
    "testcontainers.redis.enabled=false",   // Redis 사용 안 함
    "testcontainers.kafka.enabled=false",   // Kafka 사용 안 함
@@ -267,6 +272,10 @@ INSERT INTO stores (name, address) VALUES ('Test Store', 'Seoul');
 **IntegrationTestBase에서 경로 지정:**
 
 ```kotlin
+import com.groom.platform.testcontainers.annotation.IntegrationTest
+import org.springframework.boot.test.context.SpringBootTest
+
+@IntegrationTest
 @SpringBootTest(
     properties = [
         // ✅ 올바른 경로 (프로젝트 루트 기준)
@@ -1049,6 +1058,10 @@ IntegrationTestBase에서 JPA, 로깅 등의 설정도 함께 지정할 수 있�
 ### 방법 1: IntegrationTestBase에 모두 포함 (권장!)
 
 ```kotlin
+import com.groom.platform.testcontainers.annotation.IntegrationTest
+import org.springframework.boot.test.context.SpringBootTest
+
+@IntegrationTest
 @SpringBootTest(
     properties = [
         // Testcontainers 설정
@@ -1080,6 +1093,11 @@ abstract class IntegrationTestBase
 
 **IntegrationTestBase.kt:**
 ```kotlin
+import com.groom.platform.testcontainers.annotation.IntegrationTest
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
+
+@IntegrationTest
 @SpringBootTest(
     properties = [
         "testcontainers.postgres.enabled=true",
@@ -1220,6 +1238,10 @@ docker exec -it <kafka-container-id> kafka-topics --list --bootstrap-server loca
 IntegrationTestBase에서 직접 설정하세요:
 
 ```kotlin
+import com.groom.platform.testcontainers.annotation.IntegrationTest
+import org.springframework.boot.test.context.SpringBootTest
+
+@IntegrationTest
 @SpringBootTest(
     properties = [
         // Testcontainers 설정
