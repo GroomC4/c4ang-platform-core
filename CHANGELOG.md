@@ -64,16 +64,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.2-RC6] - 2024-11-18
+
+### Added
+- ✨ `project:` 프로토콜 추가로 프로젝트 루트 기준 스키마 파일 로딩 (권장)
+  - `project:store-api/sql/schema.sql` - 명확한 의도 표현
+
+### Changed
+- 🔧 `file:` 프로토콜은 절대 경로 전용으로 변경
+  - `file:/absolute/path/to/schema.sql`
+
+### Summary
+- `project:` - 프로젝트 루트 기준 상대 경로 (권장!)
+- `file:` - 파일 시스템 절대 경로
+- `classpath:` - classpath 리소스
+
 ## [1.2.2-RC5] - 2024-11-18
 
 ### Added
 - ✨ `file:` 프로토콜 지원으로 호스트 파일 시스템의 스키마 파일 로딩 가능
-  - `file:sql/schema.sql` (프로젝트 루트 기준 상대 경로)
-  - `file:/absolute/path/schema.sql` (절대 경로)
-  - 기존 `classpath:` 프로토콜도 계속 지원
 
 ### Changed
-- 🔧 스키마 로딩 로직 개선: MountableFile 사용으로 파일 시스템 직접 접근
+- 🔧 스키마 로딩 로직 개선: MountableFile 사용
+
+### Issues
+- ⚠️ 상대 경로 혼란 → RC6에서 `project:` 프로토콜로 해결
 
 ## [1.2.2-RC4] - 2024-11-18
 

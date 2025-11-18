@@ -76,11 +76,12 @@ testcontainers:
   postgres:
     enabled: true
     replica-enabled: true
-    # 스키마 파일 위치 지정 (3가지 방법 지원)
+    # 스키마 파일 위치 지정 (4가지 방법 지원)
     # 1. classpath 리소스: classpath:db/schema.sql
-    # 2. 프로젝트 루트 기준 파일: file:sql/schema.sql
-    # 3. 절대 경로 파일: file:/absolute/path/to/schema.sql
-    schema-location: classpath:db/schema.sql
+    # 2. 프로젝트 루트 기준: project:sql/schema.sql (권장!)
+    # 3. 절대 경로: file:/absolute/path/to/schema.sql
+    # 4. 프로토콜 없음: db/schema.sql (classpath와 동일)
+    schema-location: project:store-api/sql/schema.sql
   redis:
     enabled: true
   kafka:

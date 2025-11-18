@@ -76,15 +76,27 @@ class TestcontainersAutoConfiguration(
         if (!container.isRunning) {
             postgres.schemaLocation?.let { schemaPath ->
                 when {
+                    schemaPath.startsWith("project:") -> {
+                        // project: 프로토콜 - 프로젝트 루트 기준 상대 경로
+                        val relativePath = schemaPath.removePrefix("project:")
+                        val absolutePath = java.io.File(System.getProperty("user.dir"), relativePath).absolutePath
+
+                        val mountableFile = org.testcontainers.utility.MountableFile.forHostPath(absolutePath)
+                        container.withCopyFileToContainer(
+                            mountableFile,
+                            "/docker-entrypoint-initdb.d/init-schema.sql"
+                        )
+                        println("📄 PostgreSQL Primary: Schema loaded from project: $absolutePath")
+                    }
                     schemaPath.startsWith("file:") -> {
-                        // file: 프로토콜 - 호스트 파일 시스템에서 읽음
+                        // file: 프로토콜 - 파일 시스템 절대 경로
                         val filePath = schemaPath.removePrefix("file:")
                         val mountableFile = org.testcontainers.utility.MountableFile.forHostPath(filePath)
                         container.withCopyFileToContainer(
                             mountableFile,
                             "/docker-entrypoint-initdb.d/init-schema.sql"
                         )
-                        println("📄 PostgreSQL Primary: Schema loaded from host file: $filePath")
+                        println("📄 PostgreSQL Primary: Schema loaded from file: $filePath")
                     }
                     else -> {
                         // classpath: 프로토콜 또는 프로토콜 없음 - classpath 리소스에서 읽음
@@ -128,15 +140,27 @@ class TestcontainersAutoConfiguration(
         if (!container.isRunning) {
             postgres.schemaLocation?.let { schemaPath ->
                 when {
+                    schemaPath.startsWith("project:") -> {
+                        // project: 프로토콜 - 프로젝트 루트 기준 상대 경로
+                        val relativePath = schemaPath.removePrefix("project:")
+                        val absolutePath = java.io.File(System.getProperty("user.dir"), relativePath).absolutePath
+
+                        val mountableFile = org.testcontainers.utility.MountableFile.forHostPath(absolutePath)
+                        container.withCopyFileToContainer(
+                            mountableFile,
+                            "/docker-entrypoint-initdb.d/init-schema.sql"
+                        )
+                        println("📄 PostgreSQL Replica: Schema loaded from project: $absolutePath")
+                    }
                     schemaPath.startsWith("file:") -> {
-                        // file: 프로토콜 - 호스트 파일 시스템에서 읽음
+                        // file: 프로토콜 - 파일 시스템 절대 경로
                         val filePath = schemaPath.removePrefix("file:")
                         val mountableFile = org.testcontainers.utility.MountableFile.forHostPath(filePath)
                         container.withCopyFileToContainer(
                             mountableFile,
                             "/docker-entrypoint-initdb.d/init-schema.sql"
                         )
-                        println("📄 PostgreSQL Replica: Schema loaded from host file: $filePath")
+                        println("📄 PostgreSQL Replica: Schema loaded from file: $filePath")
                     }
                     else -> {
                         // classpath: 프로토콜 또는 프로토콜 없음 - classpath 리소스에서 읽음
