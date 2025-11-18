@@ -45,8 +45,11 @@ dependencies {
 package com.groom.yourservice.common
 
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.ActiveProfiles
 
+/**
+ * ⚠️ 중요: 이 클래스만으로 모든 설정 완료!
+ * @ActiveProfiles를 사용하지 않아 application-test.yml과 중복 설정 방지
+ */
 @SpringBootTest(
     properties = [
         // PostgreSQL
@@ -68,7 +71,6 @@ import org.springframework.test.context.ActiveProfiles
         "testcontainers.kafka.topics[0].replication-factor=1",
     ]
 )
-@ActiveProfiles("test")
 abstract class IntegrationTestBase
 ```
 

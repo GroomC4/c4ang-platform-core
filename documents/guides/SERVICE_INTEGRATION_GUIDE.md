@@ -159,13 +159,17 @@ dependencies {
 package com.groom.yourservice.common
 
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.ActiveProfiles
 
 /**
  * 모든 통합 테스트가 상속받을 Base 클래스
  *
- * 이 클래스는 Testcontainers 자동 구성을 위해 필수입니다.
+ * ⚠️ 중요: 이 클래스만으로 모든 설정이 완료됩니다.
  * application-test.yml이 없어도 작동합니다.
+ *
+ * @ActiveProfiles를 사용하지 않는 이유:
+ * - @SpringBootTest properties로 모든 설정을 명시적으로 제공
+ * - application-test.yml과 중복 설정 방지
+ * - 설정이 한 곳에만 있어 명확함
  */
 @SpringBootTest(
     properties = [
@@ -205,7 +209,6 @@ import org.springframework.test.context.ActiveProfiles
         // "testcontainers.schema-registry.enabled=true",
     ]
 )
-@ActiveProfiles("test")
 abstract class IntegrationTestBase
 ```
 
@@ -665,17 +668,61 @@ echo "org.gradle.parallel=true" >> gradle.properties
 
 ## application-test.yml 사용 (선택사항)
 
-IntegrationTestBase 패턴 대신 YAML 설정을 사용할 수도 있습니다.
+### 방법 1: IntegrationTestBase + application-test.yml 함께 사용
+
+**추가 Spring 설정(JPA, 로깅 등)이 필요한 경우:**
+
+**IntegrationTestBase.kt:**
+```kotlin
+@SpringBootTest(
+    properties = [
+        "testcontainers.postgres.enabled=true",
+        // ... Testcontainers 설정만
+    ]
+)
+@ActiveProfiles("test")  // ← application-test.yml 로드
+abstract class IntegrationTestBase
+```
+
+**src/test/resources/application-test.yml:**
+```yaml
+# JPA 설정 (Testcontainers와 무관한 설정)
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate  # 스키마 검증만 (create 사용 금지!)
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+# 로깅
+logging:
+  level:
+    com.groom: DEBUG
+    org.springframework.jdbc: DEBUG
+    org.hibernate.SQL: DEBUG
+
+# ⚠️ 주의: Testcontainers 설정은 IntegrationTestBase에만!
+# testcontainers:  ← 여기에 쓰지 마세요! (중복 발생)
+```
+
+**장점:**
+- ✅ Testcontainers 설정: IntegrationTestBase (명시적)
+- ✅ 기타 Spring 설정: application-test.yml (분리)
+
+**단점:**
+- ❌ 설정이 두 곳에 나뉨
+
+---
+
+### 방법 2: application-test.yml만 사용 (비권장)
 
 **⚠️ 주의: 멀티 모듈에서는 IntegrationTestBase 패턴이 더 안정적입니다!**
 
 **src/test/resources/application-test.yml:**
 
 ```yaml
-spring:
-  profiles:
-    active: test
-
 testcontainers:
   postgres:
     enabled: true
@@ -696,18 +743,15 @@ testcontainers:
         partitions: 1
         replication-factor: 1
 
-# JPA 설정
 spring:
   jpa:
     hibernate:
-      ddl-auto: validate  # 스키마 검증만 (create 사용 금지!)
+      ddl-auto: validate
     show-sql: true
 
-# 로깅
 logging:
   level:
     com.groom: DEBUG
-    org.springframework.jdbc: DEBUG
 ```
 
 **테스트 클래스:**
@@ -716,8 +760,32 @@ logging:
 @SpringBootTest
 @ActiveProfiles("test")  // application-test.yml 로드
 class StoreRepositoryTest {
-    // IntegrationTestBase 상속 없이 사용 가능
+    // IntegrationTestBase 없이 사용 가능
 }
+```
+
+**단점:**
+- ❌ 멀티 모듈에서 application-test.yml 로드가 불안정할 수 있음
+- ❌ 설정 변경 시 여러 파일 수정 필요
+- ❌ Git에 설정이 분산됨
+
+---
+
+### 권장 사항
+
+**대부분의 경우:**
+```kotlin
+// IntegrationTestBase만 사용 (application-test.yml 없음)
+@SpringBootTest(properties = [...])  // @ActiveProfiles 없음
+abstract class IntegrationTestBase
+```
+
+**JPA, 로깅 등 추가 설정이 많은 경우:**
+```kotlin
+// IntegrationTestBase + application-test.yml
+@SpringBootTest(properties = [/* Testcontainers 설정 */])
+@ActiveProfiles("test")  // JPA, 로깅 설정 로드
+abstract class IntegrationTestBase
 ```
 
 ---

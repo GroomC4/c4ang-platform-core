@@ -72,8 +72,11 @@ dependencies {
 package com.groom.yourservice.common
 
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.ActiveProfiles
 
+/**
+ * ⚠️ 이 클래스만으로 모든 설정 완료!
+ * @ActiveProfiles 없음 = application-test.yml과 중복 방지
+ */
 @SpringBootTest(
     properties = [
         "testcontainers.postgres.enabled=true",
@@ -88,7 +91,6 @@ import org.springframework.test.context.ActiveProfiles
         "testcontainers.kafka.enabled=true",
     ]
 )
-@ActiveProfiles("test")
 abstract class IntegrationTestBase
 ```
 
