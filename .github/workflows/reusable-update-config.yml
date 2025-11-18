@@ -48,7 +48,7 @@ jobs:
           echo "Updating file: $VALUES_FILE with tag: $NEW_TAG"
           
           # yq를 사용하여 'image.tag' 필드 업데이트
-          yq -i --arg tag "$NEW_TAG" '.image.tag = $tag' "$VALUES_FILE"
+          yq -i '.image.tag = env(NEW_TAG)' "$VALUES_FILE"
 
 
       - name: Commit and Push changes
