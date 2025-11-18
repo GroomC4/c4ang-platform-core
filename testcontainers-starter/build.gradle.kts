@@ -1,6 +1,8 @@
 dependencies {
     // Platform DataSource Starter 의존
-    api(project(":datasource-starter"))
+    // implementation으로 변경하여 전이 의존성 방지
+    // (TestDataSourceAutoConfiguration에서만 사용, 서비스에 노출 불필요)
+    implementation(project(":datasource-starter"))
 
     // Spring Boot
     api("org.springframework.boot:spring-boot-starter-data-jpa:3.3.4")
