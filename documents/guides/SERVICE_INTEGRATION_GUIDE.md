@@ -18,6 +18,7 @@
 ### 프로덕션 환경
 5. [프로덕션 환경 구축 (3단계)](#프로덕션-환경-구축-3단계)
 6. [프로덕션 사용법](#프로덕션-사용법)
+   - [Docker 배포](#6-docker-배포)
 
 ### 공통
 7. [트러블슈팅](#트러블슈팅)
@@ -848,6 +849,221 @@ management:
 - `hikaricp.connections.active` - 활성 연결 수
 - `hikaricp.connections.idle` - 유휴 연결 수
 - `hikaricp.connections.pending` - 대기 중인 연결 수
+
+---
+
+### 6. Docker 배포
+
+platform-core를 사용하는 서비스를 Docker로 배포할 때는 빌드 시 GitHub Packages 인증이 필요합니다.
+
+#### Dockerfile 설정
+
+**platform-core v1.2.2-RC14 이상 필수!**
+
+```dockerfile
+# ========================
+# Build Stage
+# ========================
+FROM gradle:8.5-jdk21 AS build
+
+# GitHub Packages 인증을 위한 ARG (CI/CD에서 자동 전달)
+ARG GITHUB_ACTOR
+ARG GITHUB_TOKEN
+
+# 환경 변수로 설정 (Gradle이 사용)
+ENV GITHUB_ACTOR=${GITHUB_ACTOR}
+ENV GITHUB_TOKEN=${GITHUB_TOKEN}
+
+WORKDIR /app
+COPY . .
+
+# Gradle 빌드 (platform-core 의존성 다운로드)
+RUN ./gradlew clean build -x test
+
+# ========================
+# Runtime Stage
+# ========================
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+# 빌드 결과물 복사
+COPY --from=build /app/build/libs/*.jar app.jar
+
+# 애플리케이션 실행
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+**⚠️ 핵심 포인트:**
+
+1. **ARG/ENV 선언 필수**
+   ```dockerfile
+   ARG GITHUB_ACTOR
+   ARG GITHUB_TOKEN
+   ENV GITHUB_ACTOR=${GITHUB_ACTOR}
+   ENV GITHUB_TOKEN=${GITHUB_TOKEN}
+   ```
+   - CI/CD에서 build-args로 자동 전달됨
+   - Gradle이 GitHub Packages 접근 시 사용
+
+2. **platform-core v1.2.2-RC14 이상 필요**
+   - reusable-ecr-push.yml에서 자동으로 build-args 전달
+   - 이전 버전은 수동으로 build-args 전달 필요
+
+---
+
+#### 로컬 Docker 빌드 테스트
+
+**GitHub Token 설정:**
+
+```bash
+# ~/.zshrc 또는 ~/.bashrc
+export GITHUB_ACTOR="your-username"
+export GITHUB_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+source ~/.zshrc
+```
+
+**Docker 빌드:**
+
+```bash
+docker build \
+  --build-arg GITHUB_ACTOR=$GITHUB_ACTOR \
+  --build-arg GITHUB_TOKEN=$GITHUB_TOKEN \
+  -t your-service:local \
+  .
+```
+
+**실행:**
+
+```bash
+docker run -p 8080:8080 \
+  -e SPRING_PROFILES_ACTIVE=prod \
+  -e DB_USERNAME=your_db_user \
+  -e DB_PASSWORD=your_db_password \
+  your-service:local
+```
+
+---
+
+#### CI/CD 배포 (자동)
+
+**태그 푸시만 하면 자동 배포:**
+
+```bash
+# 1. 코드 커밋
+git add .
+git commit -m "feat: 새로운 기능 추가"
+git push origin main
+
+# 2. 태그 생성 및 푸시
+git tag v1.0.0
+git push origin v1.0.0
+
+# 3. GitHub Actions가 자동으로:
+#    - Docker 이미지 빌드 (GITHUB_ACTOR, GITHUB_TOKEN 자동 전달)
+#    - ECR에 이미지 푸시
+#    - ArgoCD 설정 업데이트
+```
+
+**reusable-ecr-push.yml에서 자동 처리:**
+
+```yaml
+# platform-core v1.2.2-RC14부터 자동 포함됨
+- name: Build and push Docker image
+  uses: docker/build-push-action@v5
+  with:
+    context: ./service
+    file: ./service/Dockerfile
+    push: true
+    tags: ${{ steps.meta.outputs.tags }}
+    build-args: |
+      GITHUB_ACTOR=${{ github.actor }}          # ← 자동 전달!
+      GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}  # ← 자동 전달!
+    cache-from: type=gha
+    cache-to: type=gha,mode=max
+    platforms: linux/amd64
+```
+
+---
+
+#### 배포 에러 해결
+
+**증상 1: GitHub Packages 인증 실패**
+
+```
+Could not resolve com.groom.platform:testcontainers-starter:1.2.2-RC14.
+Username must not be null!
+```
+
+**원인:**
+- Dockerfile에 ARG/ENV 선언 누락
+
+**해결:**
+```dockerfile
+# Dockerfile 상단에 추가
+ARG GITHUB_ACTOR
+ARG GITHUB_TOKEN
+ENV GITHUB_ACTOR=${GITHUB_ACTOR}
+ENV GITHUB_TOKEN=${GITHUB_TOKEN}
+```
+
+---
+
+**증상 2: 로컬 빌드 시 인증 실패**
+
+```
+docker build -t my-service .
+# Error: Could not resolve com.groom.platform...
+```
+
+**원인:**
+- build-args 미전달
+
+**해결:**
+```bash
+# build-args 명시
+docker build \
+  --build-arg GITHUB_ACTOR=$GITHUB_ACTOR \
+  --build-arg GITHUB_TOKEN=$GITHUB_TOKEN \
+  -t my-service .
+```
+
+---
+
+#### 멀티 스테이지 빌드 최적화
+
+**레이어 캐싱 최적화:**
+
+```dockerfile
+FROM gradle:8.5-jdk21 AS build
+
+ARG GITHUB_ACTOR
+ARG GITHUB_TOKEN
+ENV GITHUB_ACTOR=${GITHUB_ACTOR}
+ENV GITHUB_TOKEN=${GITHUB_TOKEN}
+
+WORKDIR /app
+
+# 1. 의존성만 먼저 다운로드 (캐싱 활용)
+COPY build.gradle.kts settings.gradle.kts ./
+COPY gradle ./gradle
+RUN ./gradlew dependencies --no-daemon
+
+# 2. 소스 코드 복사 후 빌드
+COPY . .
+RUN ./gradlew clean build -x test --no-daemon
+
+# Runtime Stage
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=build /app/build/libs/*.jar app.jar
+
+# JVM 옵션 최적화
+ENV JAVA_OPTS="-Xms512m -Xmx1024m -XX:+UseG1GC"
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+```
 
 ---
 

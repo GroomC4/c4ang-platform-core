@@ -209,6 +209,60 @@ class OrderService(
 
 ---
 
+## Docker 배포
+
+platform-core를 사용하는 서비스의 Docker 배포를 지원합니다 (v1.2.2-RC14 이상).
+
+### Dockerfile 설정
+
+```dockerfile
+FROM gradle:8.5-jdk21 AS build
+
+# GitHub Packages 인증 (CI/CD에서 자동 전달)
+ARG GITHUB_ACTOR
+ARG GITHUB_TOKEN
+ENV GITHUB_ACTOR=${GITHUB_ACTOR}
+ENV GITHUB_TOKEN=${GITHUB_TOKEN}
+
+WORKDIR /app
+COPY . .
+RUN ./gradlew clean build -x test
+
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=build /app/build/libs/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+### CI/CD 자동 배포
+
+**태그 푸시만 하면 자동 배포:**
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+GitHub Actions가 자동으로:
+- ✅ Docker 이미지 빌드 (GitHub Token 자동 전달)
+- ✅ ECR에 푸시
+- ✅ ArgoCD 설정 업데이트
+
+### 로컬 테스트
+
+```bash
+docker build \
+  --build-arg GITHUB_ACTOR=$GITHUB_ACTOR \
+  --build-arg GITHUB_TOKEN=$GITHUB_TOKEN \
+  -t your-service:local \
+  .
+```
+
+> 📖 **상세 가이드**: [Docker 배포 섹션](documents/guides/SERVICE_INTEGRATION_GUIDE.md#6-docker-배포)
+
+---
+
 ## 프로젝트 구조
 
 ```
