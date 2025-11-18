@@ -5,9 +5,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Profile
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.KafkaContainer
 import org.testcontainers.containers.PostgreSQLContainer
@@ -59,7 +57,6 @@ import org.testcontainers.containers.PostgreSQLContainer
 @AutoConfiguration
 @ConditionalOnClass(PostgreSQLContainer::class)
 @EnableConfigurationProperties(TestcontainersProperties::class)
-@Profile("test")
 class TestcontainersAutoConfiguration(
     private val properties: TestcontainersProperties,
 ) {
