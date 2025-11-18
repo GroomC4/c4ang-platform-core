@@ -64,6 +64,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.2-RC10] - 2024-11-18
+
+### Added
+- 📝 **멀티 모듈 프로젝트 설정 가이드 추가**
+  - IntegrationTestBase 패턴 문서화
+  - IntelliJ 모듈 루트 설정 불필요한 방법 제공
+  - @SpringBootTest properties로 명시적 설정 방법
+
+### Improved
+- 📚 SERVICE_INTEGRATION_GUIDE.md 개선
+  - 멀티 모듈 Gradle 프로젝트 지원 문서 추가
+  - 코드 기반 설정 예시 추가
+  - 프로젝트 구조별 가이드 강화
+
+### Why
+- 멀티 모듈 프로젝트에서 모듈 루트 설정 없이도 작동하도록
+- IntelliJ 설정과 무관하게 일관된 테스트 환경 제공
+- 팀 협업 시 설정 불일치 문제 해결
+
+---
+
 ## [1.2.2-RC9] - 2024-11-18
 
 ### Changed

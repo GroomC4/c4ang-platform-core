@@ -308,6 +308,138 @@ src/test/kotlin/com/groom/yourservice/extension/ContainerExtension.kt
 
 ---
 
+### 4. 멀티 모듈 프로젝트 설정 (권장)
+
+멀티 모듈 Gradle 프로젝트에서 모듈을 IntelliJ 루트로 설정하지 않고 사용하는 방법입니다.
+
+#### 프로젝트 구조:
+```
+루트/
+├── settings.gradle.kts
+├── store-api/
+│   ├── src/
+│   │   └── test/
+│   │       ├── kotlin/
+│   │       └── resources/
+│   │           └── application-test.yml
+│   └── build.gradle.kts
+└── order-api/
+```
+
+#### 4-1. IntegrationTestBase 클래스 생성 (권장)
+
+모든 통합 테스트가 상속받을 Base 클래스를 만들어 설정을 명시적으로 지정합니다.
+
+**위치:** `src/test/kotlin/com/groom/yourservice/common/IntegrationTestBase.kt`
+
+```kotlin
+package com.groom.yourservice.common
+
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
+
+/**
+ * 통합 테스트 Base 클래스
+ *
+ * **멀티 모듈 프로젝트에서 필수!**
+ *
+ * IntelliJ 모듈 루트 설정과 무관하게 Testcontainers가 작동하도록
+ * 설정을 명시적으로 지정합니다.
+ *
+ * **사용법:**
+ * ```kotlin
+ * class MyIntegrationTest : IntegrationTestBase() {
+ *     // 테스트 코드
+ * }
+ * ```
+ */
+@SpringBootTest(
+    properties = [
+        // PostgreSQL 설정
+        "testcontainers.postgres.enabled=true",
+        "testcontainers.postgres.replica-enabled=true",
+        "testcontainers.postgres.schema-location=project:store-api/sql/schema.sql",  // 모듈 경로 포함
+
+        // Redis 설정
+        "testcontainers.redis.enabled=true",
+
+        // Kafka 설정
+        "testcontainers.kafka.enabled=true",
+        "testcontainers.kafka.auto-create-topics=true",
+
+        // Kafka 토픽 정의
+        "testcontainers.kafka.topics[0].name=store.info.updated",
+        "testcontainers.kafka.topics[0].partitions=3",
+        "testcontainers.kafka.topics[0].replication-factor=1",
+
+        "testcontainers.kafka.topics[1].name=store.deleted",
+        "testcontainers.kafka.topics[1].partitions=1",
+        "testcontainers.kafka.topics[1].replication-factor=1"
+    ]
+)
+@ActiveProfiles("test")
+abstract class IntegrationTestBase
+```
+
+#### 4-2. 테스트 클래스에서 사용
+
+```kotlin
+package com.groom.store.service
+
+import com.groom.yourservice.common.IntegrationTestBase
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.transaction.annotation.Transactional
+
+class UpdateStoreServiceIntegrationTest : IntegrationTestBase() {
+
+    @Autowired
+    private lateinit var storeService: StoreService
+
+    @Test
+    @Transactional(readOnly = false)
+    fun `스토어 정보를 업데이트한다`() {
+        // 테스트 코드
+    }
+}
+```
+
+#### 4-3. 장점
+
+✅ **IntelliJ 설정 무관**
+- 모듈 루트 설정 불필요
+- 모든 개발자가 동일한 환경
+
+✅ **명시적 설정**
+- 코드로 설정을 명확하게 확인 가능
+- application-test.yml과 중복되지 않음
+
+✅ **재사용성**
+- 모든 통합 테스트가 동일한 설정 사용
+- 설정 변경 시 한 곳만 수정
+
+✅ **버전 관리**
+- 설정이 Git에 포함되어 추적 가능
+
+#### 4-4. application-test.yml과 함께 사용
+
+Base 클래스와 YAML 설정을 함께 사용할 수도 있습니다:
+
+```kotlin
+@SpringBootTest(
+    properties = [
+        // 필수 설정만 명시
+        "testcontainers.postgres.schema-location=project:store-api/sql/schema.sql"
+    ]
+)
+@ActiveProfiles("test")  // application-test.yml 로드
+abstract class IntegrationTestBase
+```
+
+이 경우 `application-test.yml`의 대부분 설정을 사용하되, 경로만 명시적으로 지정합니다.
+
+---
+
 ## 사용 예시
 
 ### 1. 통합 테스트 작성
