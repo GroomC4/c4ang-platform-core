@@ -84,12 +84,10 @@ echo $GITHUB_TOKEN
 │   └── src/
 │       ├── main/
 │       └── test/
-│           ├── kotlin/
-│           │   └── com/groom/store/
-│           │       └── common/
-│           │           └── IntegrationTestBase.kt  ← 필수!
-│           └── resources/
-│               └── application-test.yml            ← 선택사항
+│           └── kotlin/
+│               └── com/groom/store/
+│                   └── common/
+│                       └── IntegrationTestBase.kt  ← 필수! (이것만 있으면 됨)
 └── order-api/                    ← 다른 도메인 서비스 모듈
 ```
 
@@ -104,12 +102,14 @@ echo $GITHUB_TOKEN
         ├── kotlin/
         │   └── com/groom/yourservice/
         │       └── common/
-        │           └── IntegrationTestBase.kt
+        │           └── IntegrationTestBase.kt  ← 필수! (이것만 있으면 됨)
         └── resources/
-            ├── db/
-            │   └── schema.sql
-            └── application-test.yml
+            └── db/
+                └── schema.sql  ← classpath: 스킴 사용 시
 ```
+
+> 📝 **참고**: `application-test.yml`은 더 이상 필요하지 않습니다!
+> 모든 설정은 `IntegrationTestBase`에서 관리합니다.
 
 ---
 
@@ -666,83 +666,57 @@ echo "org.gradle.parallel=true" >> gradle.properties
 
 ---
 
-## application-test.yml 사용 (선택사항)
+## 추가 Spring 설정 (JPA, 로깅)
 
-### 방법 1: IntegrationTestBase + application-test.yml 함께 사용
+IntegrationTestBase에서 JPA, 로깅 등의 설정도 함께 지정할 수 있습니다.
 
-**추가 Spring 설정(JPA, 로깅 등)이 필요한 경우:**
+### 방법 1: IntegrationTestBase에 모두 포함 (권장!)
+
+```kotlin
+@SpringBootTest(
+    properties = [
+        // Testcontainers 설정
+        "testcontainers.postgres.enabled=true",
+        "testcontainers.postgres.schema-location=project:store-api/sql/schema.sql",
+
+        // JPA 설정
+        "spring.jpa.hibernate.ddl-auto=validate",
+        "spring.jpa.show-sql=true",
+        "spring.jpa.properties.hibernate.format_sql=true",
+
+        // 로깅 설정
+        "logging.level.com.groom=DEBUG",
+        "logging.level.org.springframework.jdbc=DEBUG",
+        "logging.level.org.hibernate.SQL=DEBUG",
+    ]
+)
+abstract class IntegrationTestBase
+```
+
+**장점:**
+- ✅ 모든 설정이 한 곳에 (가장 명확!)
+- ✅ Git으로 설정 추적 용이
+- ✅ application-test.yml 불필요
+
+---
+
+### 방법 2: application-test.yml 분리 (설정이 매우 많은 경우만)
 
 **IntegrationTestBase.kt:**
 ```kotlin
 @SpringBootTest(
     properties = [
         "testcontainers.postgres.enabled=true",
-        // ... Testcontainers 설정만
+        // Testcontainers 설정만
     ]
 )
-@ActiveProfiles("test")  // ← application-test.yml 로드
+@ActiveProfiles("test")  // application-test.yml 로드
 abstract class IntegrationTestBase
 ```
 
 **src/test/resources/application-test.yml:**
 ```yaml
-# JPA 설정 (Testcontainers와 무관한 설정)
-spring:
-  jpa:
-    hibernate:
-      ddl-auto: validate  # 스키마 검증만 (create 사용 금지!)
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-
-# 로깅
-logging:
-  level:
-    com.groom: DEBUG
-    org.springframework.jdbc: DEBUG
-    org.hibernate.SQL: DEBUG
-
-# ⚠️ 주의: Testcontainers 설정은 IntegrationTestBase에만!
-# testcontainers:  ← 여기에 쓰지 마세요! (중복 발생)
-```
-
-**장점:**
-- ✅ Testcontainers 설정: IntegrationTestBase (명시적)
-- ✅ 기타 Spring 설정: application-test.yml (분리)
-
-**단점:**
-- ❌ 설정이 두 곳에 나뉨
-
----
-
-### 방법 2: application-test.yml만 사용 (비권장)
-
-**⚠️ 주의: 멀티 모듈에서는 IntegrationTestBase 패턴이 더 안정적입니다!**
-
-**src/test/resources/application-test.yml:**
-
-```yaml
-testcontainers:
-  postgres:
-    enabled: true
-    replica-enabled: true
-    schema-location: project:store-api/sql/schema.sql
-
-  redis:
-    enabled: true
-
-  kafka:
-    enabled: true
-    auto-create-topics: true
-    topics:
-      - name: store.info.updated
-        partitions: 3
-        replication-factor: 1
-      - name: store.deleted
-        partitions: 1
-        replication-factor: 1
-
+# JPA, 로깅 등 Testcontainers와 무관한 설정만
 spring:
   jpa:
     hibernate:
@@ -754,39 +728,9 @@ logging:
     com.groom: DEBUG
 ```
 
-**테스트 클래스:**
-
-```kotlin
-@SpringBootTest
-@ActiveProfiles("test")  // application-test.yml 로드
-class StoreRepositoryTest {
-    // IntegrationTestBase 없이 사용 가능
-}
-```
-
-**단점:**
-- ❌ 멀티 모듈에서 application-test.yml 로드가 불안정할 수 있음
-- ❌ 설정 변경 시 여러 파일 수정 필요
-- ❌ Git에 설정이 분산됨
-
----
-
-### 권장 사항
-
-**대부분의 경우:**
-```kotlin
-// IntegrationTestBase만 사용 (application-test.yml 없음)
-@SpringBootTest(properties = [...])  // @ActiveProfiles 없음
-abstract class IntegrationTestBase
-```
-
-**JPA, 로깅 등 추가 설정이 많은 경우:**
-```kotlin
-// IntegrationTestBase + application-test.yml
-@SpringBootTest(properties = [/* Testcontainers 설정 */])
-@ActiveProfiles("test")  // JPA, 로깅 설정 로드
-abstract class IntegrationTestBase
-```
+**⚠️ 주의:**
+- Testcontainers 설정은 IntegrationTestBase에만!
+- application-test.yml에 `testcontainers:` 섹션을 쓰면 중복 발생!
 
 ---
 
@@ -858,19 +802,23 @@ docker exec -it <kafka-container-id> kafka-topics --list --bootstrap-server loca
 
 ### 로그 레벨 조정
 
+IntegrationTestBase에서 직접 설정하세요:
+
 ```kotlin
-// IntegrationTestBase.kt
 @SpringBootTest(
     properties = [
-        // ... 기존 설정 ...
+        // Testcontainers 설정
+        "testcontainers.postgres.enabled=true",
+        // ...
 
-        // 로그 레벨
+        // 로그 레벨 (원하는 대로 조정)
         "logging.level.com.groom=DEBUG",
         "logging.level.org.springframework.jdbc=DEBUG",
         "logging.level.org.hibernate.SQL=DEBUG",
         "logging.level.org.testcontainers=INFO",
     ]
 )
+abstract class IntegrationTestBase
 ```
 
 ---

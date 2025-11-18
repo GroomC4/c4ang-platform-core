@@ -197,7 +197,7 @@ c4ang-platform-core/
 - Kafka 자동 시작
 - Schema Registry 자동 시작 (Kafka Avro 직렬화 지원)
 - DataSource 자동 구성 (TestDataSourceAutoConfiguration)
-- application-test.yml 기반 설정
+- IntegrationTestBase 패턴으로 간편한 설정 (application-test.yml 불필요!)
 
 **의존성:** datasource-core (api) - ⚠️ datasource-starter 제외 (순환 참조 방지)
 **사용 대상:** 모든 마이크로서비스 (테스트)
