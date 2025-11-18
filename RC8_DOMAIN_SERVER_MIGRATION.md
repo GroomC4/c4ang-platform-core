@@ -47,6 +47,10 @@ testcontainers:
     enabled: true
     replica-enabled: true
     schema-location: project:store-api/sql/schema.sql
+    # ⚠️ project: 스킴은 프로젝트 루트 기준입니다 (모듈 루트 아님)
+    #    프로젝트 루트 = settings.gradle.kts가 있는 위치
+    #    예: project:{모듈명}/sql/schema.sql
+    # 📖 자세한 설명: documents/guides/SERVICE_INTEGRATION_GUIDE.md 참고
 
   redis:
     enabled: true

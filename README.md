@@ -76,11 +76,12 @@ testcontainers:
   postgres:
     enabled: true
     replica-enabled: true
-    # 스키마 파일 위치 지정 (4가지 방법 지원)
-    # 1. classpath 리소스: classpath:db/schema.sql
-    # 2. 프로젝트 루트 기준: project:sql/schema.sql (권장!)
-    # 3. 절대 경로: file:/absolute/path/to/schema.sql
-    # 4. 프로토콜 없음: db/schema.sql (classpath와 동일)
+    # 스키마 파일 위치 지정 (3가지 방법 지원)
+    # 1. 프로젝트 루트 기준: project:{모듈명}/sql/schema.sql (멀티모듈 권장!)
+    #    - 프로젝트 루트 = settings.gradle.kts가 있는 위치
+    #    - 모듈 루트가 아님!
+    # 2. classpath 리소스: classpath:db/schema.sql (단일 모듈)
+    # 3. 절대 경로: file:/absolute/path/to/schema.sql (특수한 경우)
     schema-location: project:store-api/sql/schema.sql
   redis:
     enabled: true

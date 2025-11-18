@@ -438,6 +438,105 @@ abstract class IntegrationTestBase
 
 이 경우 `application-test.yml`의 대부분 설정을 사용하되, 경로만 명시적으로 지정합니다.
 
+#### 4-5. 스키마 파일 경로 지정 (project: 스킴 상세)
+
+멀티 모듈 프로젝트에서 스키마 파일 경로를 지정할 때 **`project:` 스킴의 시작점은 프로젝트 루트**입니다.
+
+**📌 중요:** `project:` 스킴은 모듈 루트가 아닌 **프로젝트 루트**(settings.gradle.kts가 있는 위치)를 기준으로 합니다.
+
+##### 프로젝트 구조 예시:
+```
+루트/                           ← project: 스킴의 시작점
+├── settings.gradle.kts         ← 프로젝트 루트를 나타내는 파일
+├── store-api/
+│   ├── sql/
+│   │   └── schema.sql
+│   └── src/
+└── order-api/
+    ├── sql/
+    │   └── schema.sql
+    └── src/
+```
+
+##### 경로 지정 예시:
+
+```kotlin
+@SpringBootTest(
+    properties = [
+        // ✅ 올바른 경로: 프로젝트 루트부터 시작
+        "testcontainers.postgres.schema-location=project:store-api/sql/schema.sql",
+
+        // ❌ 잘못된 경로: 모듈 루트 기준으로 작성
+        // "testcontainers.postgres.schema-location=project:sql/schema.sql"
+    ]
+)
+abstract class IntegrationTestBase
+```
+
+##### 내부 동작 방식:
+
+```kotlin
+// TestcontainersAutoConfiguration.kt 내부 코드
+schemaPath.startsWith("project:") -> {
+    val relativePath = schemaPath.removePrefix("project:")  // "store-api/sql/schema.sql"
+    val absolutePath = File(System.getProperty("user.dir"), relativePath).absolutePath
+    // user.dir = JVM 시작 디렉토리 = 프로젝트 루트
+}
+```
+
+##### 스킴별 비교:
+
+| 스킴 | 시작점 | 예시 | 사용 사례 |
+|------|--------|------|----------|
+| **`project:`** | 프로젝트 루트 (settings.gradle.kts 위치) | `project:store-api/sql/schema.sql` | 멀티 모듈 프로젝트 (권장) |
+| **`file:`** | 파일 시스템 절대 경로 | `file:/absolute/path/to/schema.sql` | 특수한 경우 |
+| **`classpath:`** | Classpath 리소스 | `classpath:db/schema.sql` | 단일 모듈 또는 src/test/resources 사용 시 |
+
+##### 모듈별 경로 예시:
+
+```kotlin
+// store-api 모듈의 IntegrationTestBase
+@SpringBootTest(
+    properties = [
+        "testcontainers.postgres.schema-location=project:store-api/sql/schema.sql"
+        // 프로젝트 루트 → store-api → sql → schema.sql
+    ]
+)
+abstract class IntegrationTestBase
+
+// order-api 모듈의 IntegrationTestBase
+@SpringBootTest(
+    properties = [
+        "testcontainers.postgres.schema-location=project:order-api/sql/schema.sql"
+        // 프로젝트 루트 → order-api → sql → schema.sql
+    ]
+)
+abstract class IntegrationTestBase
+```
+
+##### 주의사항:
+
+⚠️ **IntelliJ 모듈 루트 설정과 무관합니다**
+- `project:` 스킴은 항상 프로젝트 루트부터 시작
+- IntelliJ에서 모듈을 루트로 설정해도 경로는 동일하게 유지
+
+⚠️ **Gradle 실행 위치에 주의**
+- Gradle 실행은 항상 프로젝트 루트에서 수행
+- `./gradlew test` 실행 위치가 프로젝트 루트여야 함
+
+✅ **권장 디렉토리 구조**
+```
+루트/
+├── settings.gradle.kts
+├── {module-name}/
+│   ├── sql/              ← 모듈별 SQL 파일 (권장)
+│   │   └── schema.sql
+│   └── src/
+│       └── test/
+│           └── resources/
+│               └── application-test.yml
+```
+
 ---
 
 ## 사용 예시
