@@ -21,6 +21,7 @@ import javax.sql.DataSource
  * **주의사항:**
  * - 이 설정은 프로덕션 환경용입니다
  * - 테스트 환경은 testcontainers-starter를 사용하세요
+ * - @Profile("!test") 조건으로 테스트 환경에서는 비활성화됨
  *
  * **서비스에서 해야 할 일:**
  * 1. application.yml에 master/replica datasource 설정
@@ -52,6 +53,7 @@ import javax.sql.DataSource
 @AutoConfiguration(before = [SpringDataSourceAutoConfiguration::class])
 @ConditionalOnClass(DataSource::class)
 @EnableConfigurationProperties(PlatformDataSourceProperties::class)
+@org.springframework.context.annotation.Profile("!test")  // ⭐ 테스트 환경에서는 비활성화
 class DataSourceAutoConfiguration {
 
     /**

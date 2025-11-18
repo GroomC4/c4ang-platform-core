@@ -23,40 +23,40 @@ import org.testcontainers.utility.DockerImageName
  */
 object SharedContainers {
     /**
-     * PostgreSQL Primary 컨테이너 (싱글톤)
+     * 컨테이너 간 통신을 위한 공유 네트워크
+     */
+    private val network: org.testcontainers.containers.Network by lazy {
+        org.testcontainers.containers.Network.newNetwork()
+    }
+
+    /**
+     * PostgreSQL 컨테이너 (싱글톤)
+     *
+     * **단일 컨테이너 모드:**
+     * - 테스트 환경에서는 단일 PostgreSQL 인스턴스 사용
+     * - Primary와 Replica DataSource 모두 이 컨테이너를 참조
+     * - 라우팅 로직은 정상 작동하지만 실제 복제는 없음
+     *
+     * **장점:**
+     * - 빠른 테스트 실행 (컨테이너 1개만 시작)
+     * - 간단한 설정
+     * - @Transactional(readOnly) 라우팅 로직 테스트 가능
+     *
+     * **향후 계획:**
+     * - 실제 Streaming Replication 구현 예정 (v2.0)
+     * - GenericContainer 기반 커스텀 복제 설정
      *
      * lazy 초기화: 처음 사용될 때 한 번만 시작됩니다.
      */
     val postgresContainer: PostgreSQLContainer<*> by lazy {
-        println("🚀 Starting shared PostgreSQL Primary container...")
+        println("🚀 Initializing shared PostgreSQL container...")
         PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
             .withDatabaseName("testdb")
             .withUsername("test")
             .withPassword("test")
-            .withReuse(true)
-            .apply {
-                start()
-                println("✅ PostgreSQL Primary container started and ready (${this.jdbcUrl})")
-            }
-    }
-
-    /**
-     * PostgreSQL Replica 컨테이너 (싱글톤)
-     *
-     * 참고: 테스트 환경에서는 실제 복제를 구성하지 않고,
-     * 별도의 독립적인 PostgreSQL 인스턴스를 Replica로 사용합니다.
-     */
-    val postgresReplicaContainer: PostgreSQLContainer<*> by lazy {
-        println("🚀 Starting shared PostgreSQL Replica container...")
-        PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
-            .withDatabaseName("testdb")
-            .withUsername("test")
-            .withPassword("test")
-            .withReuse(true)
-            .apply {
-                start()
-                println("✅ PostgreSQL Replica container started and ready (${this.jdbcUrl})")
-            }
+            .withReuse(false)  // 매번 새로운 컨테이너로 스키마 재적용 보장
+            // Note: Do NOT call start() here!
+            // The container will be started after schema configuration in TestcontainersAutoConfiguration
     }
 
     /**
@@ -66,7 +66,7 @@ object SharedContainers {
         println("🚀 Starting shared Redis container...")
         GenericContainer(DockerImageName.parse("redis:7-alpine"))
             .withExposedPorts(6379)
-            .withReuse(true)
+            .withReuse(false)  // 매번 새로운 컨테이너로 깨끗한 환경 보장
             .apply {
                 start()
                 println("✅ Redis container started and ready (${this.host}:${this.getMappedPort(6379)})")
@@ -77,14 +77,31 @@ object SharedContainers {
      * Kafka 컨테이너 (싱글톤)
      *
      * KRaft 모드를 사용하여 Zookeeper 없이 작동합니다.
+     *
+     * **토픽 자동 생성 설정:**
+     * - auto.create.topics.enable=true: Producer가 존재하지 않는 토픽에 메시지를 보낼 때 자동 생성
+     * - num.partitions=1: 자동 생성되는 토픽의 기본 파티션 수
+     * - default.replication.factor=1: 단일 브로커 환경이므로 복제 계수 1
+     *
+     * **주의사항:**
+     * - 프로덕션 환경에서는 토픽을 사전에 생성하고 적절한 파티션/복제 설정을 권장
+     * - 테스트 환경에서는 편의를 위해 자동 생성 활성화
      */
     val kafkaContainer: KafkaContainer by lazy {
         println("🚀 Starting shared Kafka container...")
         KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.1"))
-            .withReuse(true)
+            .withNetwork(network)
+            .withNetworkAliases("kafka")
+            .withEnv("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "true")
+            .withEnv("KAFKA_NUM_PARTITIONS", "1")
+            .withEnv("KAFKA_DEFAULT_REPLICATION_FACTOR", "1")
+            .withReuse(false)  // 매번 새로운 컨테이너로 깨끗한 환경 보장
             .apply {
                 start()
                 println("✅ Kafka container started and ready (${this.bootstrapServers})")
+                println("   - Auto Create Topics: Enabled")
+                println("   - Default Partitions: 1")
+                println("   - Replication Factor: 1")
             }
     }
 
@@ -105,12 +122,14 @@ object SharedContainers {
         val kafka = kafkaContainer
 
         GenericContainer(DockerImageName.parse("confluentinc/cp-schema-registry:7.5.1"))
+            .withNetwork(network)
+            .withNetworkAliases("schema-registry")
             .withExposedPorts(8081)
             .withEnv("SCHEMA_REGISTRY_HOST_NAME", "schema-registry")
             .withEnv("SCHEMA_REGISTRY_LISTENERS", "http://0.0.0.0:8081")
             .withEnv(
                 "SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS",
-                "PLAINTEXT://${kafka.host}:${kafka.firstMappedPort}"
+                "PLAINTEXT://kafka:9092"  // Network alias 사용
             )
             // ===== _schemas 토픽 안정성 설정 =====
             // 테스트 환경: 단일 브로커이므로 replication.factor=1
@@ -132,7 +151,15 @@ object SharedContainers {
             // 다른 옵션: FORWARD, FULL, NONE
             .withEnv("SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL", "BACKWARD")
 
-            .withReuse(true)
+            // Wait strategy: Schema Registry가 완전히 준비될 때까지 대기
+            .waitingFor(
+                org.testcontainers.containers.wait.strategy.HttpWaitStrategy()
+                    .forPath("/subjects")
+                    .forPort(8081)
+                    .forStatusCode(200)
+                    .withStartupTimeout(java.time.Duration.ofSeconds(60))
+            )
+            .withReuse(false)  // 매번 새로운 컨테이너로 깨끗한 환경 보장
             .apply {
                 start()
                 val schemaRegistryUrl = "http://${this.host}:${this.getMappedPort(8081)}"
@@ -143,24 +170,4 @@ object SharedContainers {
             }
     }
 
-    /**
-     * 스키마를 적용한 PostgreSQL Primary 컨테이너를 반환합니다.
-     *
-     * @param schemaLocation 스키마 파일 경로 (예: "db/schema.sql")
-     * @return 스키마가 적용된 PostgreSQL 컨테이너
-     */
-    fun getPostgresWithSchema(schemaLocation: String): PostgreSQLContainer<*> {
-        // 이미 시작된 컨테이너에 스키마 적용
-        // 주의: withInitScript는 컨테이너 시작 전에만 작동하므로,
-        // 여기서는 이미 시작된 컨테이너를 반환만 합니다.
-        // 스키마 적용은 TestcontainersAutoConfiguration에서 처리합니다.
-        return postgresContainer
-    }
-
-    /**
-     * 스키마를 적용한 PostgreSQL Replica 컨테이너를 반환합니다.
-     */
-    fun getPostgresReplicaWithSchema(schemaLocation: String): PostgreSQLContainer<*> {
-        return postgresReplicaContainer
-    }
 }

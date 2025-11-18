@@ -23,13 +23,18 @@ case "$REPO_NAME" in
   "c4ang-customer-service")
     ECR_REPOSITORY="c4ang-customer-service"
     ;;
-  # Add more mappings as needed
-  # "c4ang-order-service")
-  #   ECR_REPOSITORY="c4ang-order-service"
-  #   ;;
-  # "c4ang-product-service")
-  #   ECR_REPOSITORY="c4ang-product-service"
-  #   ;;
+   "c4ang-order-service")
+     ECR_REPOSITORY="c4ang-order-service"
+     ;;
+   "c4ang-product-service")
+     ECR_REPOSITORY="c4ang-product-service"
+     ;;
+   "c4ang-payment-service")
+     ECR_REPOSITORY="c4ang-payment-service"
+     ;;
+   "c4ang-store-service")
+     ECR_REPOSITORY="c4ang-store-service"
+     ;;
   *)
     # Default: use repository name as-is
     ECR_REPOSITORY="$REPO_NAME"

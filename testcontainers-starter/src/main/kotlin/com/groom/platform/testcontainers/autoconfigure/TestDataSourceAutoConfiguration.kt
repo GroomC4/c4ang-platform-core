@@ -10,10 +10,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
-import org.springframework.context.annotation.Profile
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy
@@ -51,10 +49,11 @@ import javax.sql.DataSource
  * }
  * ```
  */
-@TestConfiguration
-@AutoConfiguration(before = [DataSourceAutoConfiguration::class])
+@AutoConfiguration(
+    before = [DataSourceAutoConfiguration::class],
+    after = [TestcontainersAutoConfiguration::class],
+)
 @ConditionalOnClass(PostgreSQLContainer::class)
-@Profile("test")
 class TestDataSourceAutoConfiguration {
 
     /**
