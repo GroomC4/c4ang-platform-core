@@ -84,9 +84,9 @@ import org.springframework.boot.test.context.SpringBootTest
         "testcontainers.postgres.enabled=true",
         "testcontainers.postgres.replica-enabled=true",
 
-        // project: 스킴 (프로젝트 루트 기준 - 권장!)
-        "testcontainers.postgres.schema-location=project:your-module/sql/schema.sql",
-        //                                                 ↑ 모듈명/sql/schema.sql
+        // project: 스킴 - 자동 경로 탐색 (IntelliJ/Gradle 모두 지원)
+        "testcontainers.postgres.schema-location=project:sql/schema.sql",
+        //                                                 ↑ 모듈 내 sql/schema.sql
 
         "testcontainers.redis.enabled=true",
         "testcontainers.kafka.enabled=true",

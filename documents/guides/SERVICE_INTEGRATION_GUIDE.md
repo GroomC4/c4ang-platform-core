@@ -185,17 +185,13 @@ import org.springframework.boot.test.context.SpringBootTest
         "testcontainers.postgres.enabled=true",
         "testcontainers.postgres.replica-enabled=true",
 
-        // 스키마 파일 경로 (3가지 방법 중 선택)
-        // 1️⃣ 멀티 모듈: project: 스킴 (권장!)
-        "testcontainers.postgres.schema-location=project:store-api/sql/schema.sql",
-        //    ↑ 프로젝트 루트 기준 (settings.gradle.kts가 있는 위치)
+        // 스키마 파일 경로 (project: 스킴 권장 - 자동 경로 탐색)
+        "testcontainers.postgres.schema-location=project:sql/schema.sql",
+        //    ↑ 모듈 내 sql/schema.sql (IntelliJ/Gradle 자동 지원)
 
-        // 2️⃣ 단일 모듈: classpath: 스킴
-        // "testcontainers.postgres.schema-location=classpath:db/schema.sql",
-        //    ↑ src/test/resources/db/schema.sql
-
-        // 3️⃣ 절대 경로: file: 스킴
-        // "testcontainers.postgres.schema-location=file:/absolute/path/to/schema.sql",
+        // 다른 방법들
+        // "testcontainers.postgres.schema-location=classpath:db/schema.sql",  // classpath
+        // "testcontainers.postgres.schema-location=file:/absolute/path/to/schema.sql",  // 절대 경로
 
         // ===== Redis 설정 =====
         "testcontainers.redis.enabled=true",
@@ -223,8 +219,8 @@ abstract class IntegrationTestBase
 **⚠️ 주의사항:**
 
 1. **스키마 파일 경로는 프로젝트에 맞게 수정하세요**
-   - 멀티 모듈: `project:{모듈명}/sql/schema.sql`
-   - 단일 모듈: `classpath:db/schema.sql`
+   - `project:sql/schema.sql` (권장 - 자동 경로 탐색)
+   - 또는 `classpath:db/schema.sql`, `file:/absolute/path`
 
 2. **Kafka 토픽은 실제 사용하는 토픽으로 변경하세요**
 
@@ -274,7 +270,7 @@ INSERT INTO stores (name, address) VALUES ('Test Store', 'Seoul');
 @SpringBootTest(
     properties = [
         // ✅ 올바른 경로 (프로젝트 루트 기준)
-        "testcontainers.postgres.schema-location=project:store-api/sql/schema.sql",
+        "testcontainers.postgres.schema-location=project:sql/schema.sql",
 
         // ❌ 잘못된 경로
         // "testcontainers.postgres.schema-location=classpath:sql/schema.sql"
@@ -923,7 +919,7 @@ java.io.FileNotFoundException: class path resource [db/schema.sql] cannot be ope
 //   ↑ 멀티 모듈에서는 classpath가 모호함!
 
 // ✅ 올바른 경로
-"testcontainers.postgres.schema-location=project:store-api/sql/schema.sql"
+"testcontainers.postgres.schema-location=project:sql/schema.sql"
 //   ↑ 프로젝트 루트 기준 명시적 경로
 ```
 
@@ -1057,7 +1053,7 @@ IntegrationTestBase에서 JPA, 로깅 등의 설정도 함께 지정할 수 있�
     properties = [
         // Testcontainers 설정
         "testcontainers.postgres.enabled=true",
-        "testcontainers.postgres.schema-location=project:store-api/sql/schema.sql",
+        "testcontainers.postgres.schema-location=project:sql/schema.sql",
 
         // JPA 설정
         "spring.jpa.hibernate.ddl-auto=validate",
@@ -1116,38 +1112,42 @@ logging:
 
 ## 스키마 파일 경로 가이드
 
-### project: 스킴 (멀티 모듈 - 권장!)
+### project: 스킴 (권장! - 자동 경로 탐색)
 
 **사용법:**
 ```kotlin
-"testcontainers.postgres.schema-location=project:your-module-name/sql/schema.sql"
+"testcontainers.postgres.schema-location=project:sql/schema.sql"
 ```
 
-**동작 방식:**
-- `project:` = 프로젝트 루트 (`System.getProperty("user.dir")`)
-- 프로젝트 루트 = settings.gradle.kts가 있는 위치
-- 경로: 프로젝트 루트 + `your-module-name/sql/schema.sql`
+**동작 방식 (자동 경로 탐색):**
+- **IntelliJ에서 실행**: 모듈 루트 기준으로 탐색
+- **Gradle 명령어**: 프로젝트 루트 기준으로 탐색
+- 두 경로를 모두 시도하여 존재하는 파일을 자동으로 찾음
 
 **프로젝트 구조:**
 ```
-프로젝트 루트/              ← project: 시작점
-├── settings.gradle.kts     ← 프로젝트 루트를 나타냄
+프로젝트 루트/
+├── settings.gradle.kts
 ├── store-api/
+│   ├── build.gradle.kts    ← IntelliJ 실행 시 여기가 기준
 │   └── sql/
-│       └── schema.sql      ← project:store-api/sql/schema.sql
+│       └── schema.sql      ← project:sql/schema.sql
 └── order-api/
+    ├── build.gradle.kts    ← IntelliJ 실행 시 여기가 기준
     └── sql/
-        └── schema.sql      ← project:order-api/sql/schema.sql
+        └── schema.sql      ← project:sql/schema.sql
 ```
 
-**예시:**
+**예시 (모든 모듈에서 동일):**
 ```kotlin
-// store-api 모듈
-"testcontainers.postgres.schema-location=project:store-api/sql/schema.sql"
-
-// order-api 모듈
-"testcontainers.postgres.schema-location=project:order-api/sql/schema.sql"
+// store-api, order-api 모두 동일한 경로 사용
+"testcontainers.postgres.schema-location=project:sql/schema.sql"
 ```
+
+**장점:**
+- ✅ IntelliJ와 Gradle 명령어 모두 지원
+- ✅ 환경별로 경로를 바꿀 필요 없음
+- ✅ 간단한 경로 표현
 
 ---
 
@@ -1187,13 +1187,13 @@ logging:
 
 ### 권장 사항
 
-| 프로젝트 타입 | 권장 스킴 | 스키마 위치 |
-|--------------|----------|------------|
-| **멀티 모듈** | `project:` | `your-module/sql/schema.sql` |
-| **단일 모듈** | `project:` | `sql/schema.sql` |
-| **특수한 경우** | `file:` | 절대 경로 |
+| 프로젝트 타입 | 권장 스킴 | 스키마 위치 | 비고 |
+|--------------|----------|------------|------|
+| **멀티 모듈** | `project:` | `sql/schema.sql` | 자동 경로 탐색 |
+| **단일 모듈** | `project:` | `sql/schema.sql` | 자동 경로 탐색 |
+| **특수한 경우** | `file:` | 절대 경로 | 명시적 경로 지정 시 |
 
-> 💡 **팁**: 모든 경우에 `project:` 스킴을 사용하는 것이 가장 명확합니다!
+> 💡 **팁**: `project:` 스킴은 IntelliJ/Gradle 환경을 자동으로 인식하여 경로를 찾습니다!
 
 ---
 

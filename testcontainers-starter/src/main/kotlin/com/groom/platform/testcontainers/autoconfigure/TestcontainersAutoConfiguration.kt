@@ -83,16 +83,33 @@ class TestcontainersAutoConfiguration(
                 println("🔍 [DEBUG] Schema path found: $schemaPath")
                 when {
                     schemaPath.startsWith("project:") -> {
-                        // project: 프로토콜 - 프로젝트 루트 기준 상대 경로
+                        // project: 프로토콜 - 자동 경로 탐색 (IntelliJ/Gradle 환경 모두 지원)
                         val relativePath = schemaPath.removePrefix("project:")
-                        val absolutePath = java.io.File(System.getProperty("user.dir"), relativePath).absolutePath
 
-                        val mountableFile = org.testcontainers.utility.MountableFile.forHostPath(absolutePath)
+                        // 경로 후보들을 시도 (IntelliJ는 모듈 루트, Gradle은 프로젝트 루트)
+                        val userDir = java.io.File(System.getProperty("user.dir"))
+                        val candidates = listOfNotNull(
+                            userDir.resolve(relativePath),  // 1순위: user.dir 기준 (IntelliJ 모듈 루트)
+                            userDir.parentFile?.resolve(relativePath)  // 2순위: 상위 디렉토리 기준 (Gradle 프로젝트 루트)
+                        )
+
+                        // 실제 존재하는 첫 번째 파일 찾기
+                        val schemaFile = candidates.firstOrNull { it.exists() }
+                            ?: throw IllegalStateException(
+                                "Schema file not found: $relativePath\n" +
+                                "Tried the following paths:\n" +
+                                candidates.joinToString("\n") { "  - ${it.absolutePath}" } +
+                                "\n\nPlease check:\n" +
+                                "  1. Schema file exists at one of the paths above\n" +
+                                "  2. Path is correct in testcontainers.postgres.schema-location"
+                            )
+
+                        val mountableFile = org.testcontainers.utility.MountableFile.forHostPath(schemaFile.absolutePath)
                         container.withCopyFileToContainer(
                             mountableFile,
                             "/docker-entrypoint-initdb.d/init-schema.sql"
                         )
-                        println("📄 PostgreSQL Primary: Schema loaded from project: $absolutePath")
+                        println("📄 PostgreSQL Primary: Schema loaded from project: ${schemaFile.absolutePath}")
                     }
                     schemaPath.startsWith("file:") -> {
                         // file: 프로토콜 - 파일 시스템 절대 경로

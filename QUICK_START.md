@@ -55,8 +55,8 @@ import org.springframework.boot.test.context.SpringBootTest
         // PostgreSQL
         "testcontainers.postgres.enabled=true",
         "testcontainers.postgres.replica-enabled=true",
-        "testcontainers.postgres.schema-location=project:your-module-name/sql/schema.sql",
-        //                                               ↑ 여기를 수정하세요!
+        "testcontainers.postgres.schema-location=project:sql/schema.sql",
+        //                                               ↑ 모듈 내 sql/schema.sql
 
         // Redis (필요 없으면 false)
         "testcontainers.redis.enabled=true",
@@ -76,7 +76,7 @@ abstract class IntegrationTestBase
 
 **⚠️ 필수 수정 사항:**
 
-1. `your-module-name` → 실제 모듈 이름
+1. `sql/schema.sql` → 실제 스키마 파일 경로 (모듈 내 위치)
 2. `your.topic.name` → 실제 Kafka 토픽 이름
 
 ---
@@ -88,7 +88,8 @@ abstract class IntegrationTestBase
 ```
 프로젝트 루트/
 ├── settings.gradle.kts
-└── your-module-name/      ← 모듈 디렉토리
+└── your-module/           ← 모듈 디렉토리
+    ├── build.gradle.kts
     ├── sql/
     │   └── schema.sql     ← 여기에 DDL 작성!
     └── src/
@@ -113,15 +114,15 @@ CREATE INDEX idx_stores_name ON stores(name);
 **IntegrationTestBase에서 경로 지정:**
 
 ```kotlin
-// ✅ 올바른 경로 (프로젝트 루트 기준)
-"testcontainers.postgres.schema-location=project:your-module-name/sql/schema.sql",
+// ✅ 올바른 경로 (자동 경로 탐색 - IntelliJ/Gradle 모두 지원)
+"testcontainers.postgres.schema-location=project:sql/schema.sql",
 
 // ❌ 잘못된 경로
 // "testcontainers.postgres.schema-location=classpath:sql/schema.sql"
 // ↑ 멀티 모듈에서는 동작하지 않음!
 ```
 
-> 💡 **참고**: `project:` 스킴은 프로젝트 루트(settings.gradle.kts가 있는 위치)를 기준으로 합니다.
+> 💡 **참고**: `project:` 스킴은 자동으로 경로를 탐색합니다 (IntelliJ 실행 시: 모듈 루트 기준, Gradle 명령어: 프로젝트 루트 기준).
 
 ---
 
@@ -192,21 +193,21 @@ docker ps
 
 ### 3. 스키마 파일 못 찾음
 
-**올바른 경로 (멀티 모듈):**
+**올바른 경로 (자동 탐색):**
 
 ```kotlin
-// ✅ 올바른 경로
-"testcontainers.postgres.schema-location=project:your-module-name/sql/schema.sql"
+// ✅ 올바른 경로 (자동으로 IntelliJ/Gradle 환경 모두 지원)
+"testcontainers.postgres.schema-location=project:sql/schema.sql"
 
 // ❌ 잘못된 경로들
 "testcontainers.postgres.schema-location=classpath:sql/schema.sql"  // 멀티 모듈에서 안 됨!
-"testcontainers.postgres.schema-location=project:sql/schema.sql"     // 모듈 이름 누락!
 ```
 
 **파일 위치 확인:**
 ```
 프로젝트 루트/
-└── your-module-name/
+└── your-module/
+    ├── build.gradle.kts
     └── sql/
         └── schema.sql  ← 이 파일이 존재해야 함!
 ```
