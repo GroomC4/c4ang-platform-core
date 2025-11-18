@@ -83,37 +83,45 @@ abstract class IntegrationTestBase
 
 ## Step 3: 스키마 파일 준비 (1분)
 
-**멀티 모듈 프로젝트 (권장):**
+**스키마 파일 위치:**
 
 ```
-your-module-name/
-└── sql/
-    └── schema.sql  ← 여기에 DDL 작성!
-```
-
-**단일 모듈 프로젝트:**
-
-```
-src/test/resources/
-└── db/
-    └── schema.sql  ← 여기에 DDL 작성!
-```
-
-그리고 IntegrationTestBase의 경로를 변경:
-
-```kotlin
-"testcontainers.postgres.schema-location=classpath:db/schema.sql",
+프로젝트 루트/
+├── settings.gradle.kts
+└── your-module-name/      ← 모듈 디렉토리
+    ├── sql/
+    │   └── schema.sql     ← 여기에 DDL 작성!
+    └── src/
 ```
 
 **schema.sql 예시:**
 
 ```sql
-CREATE TABLE IF NOT EXISTS your_table (
+-- 테이블 생성
+CREATE TABLE IF NOT EXISTS stores (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    address VARCHAR(500),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 인덱스 생성
+CREATE INDEX idx_stores_name ON stores(name);
 ```
+
+**IntegrationTestBase에서 경로 지정:**
+
+```kotlin
+// ✅ 올바른 경로 (프로젝트 루트 기준)
+"testcontainers.postgres.schema-location=project:your-module-name/sql/schema.sql",
+
+// ❌ 잘못된 경로
+// "testcontainers.postgres.schema-location=classpath:sql/schema.sql"
+// ↑ 멀티 모듈에서는 동작하지 않음!
+```
+
+> 💡 **참고**: `project:` 스킴은 프로젝트 루트(settings.gradle.kts가 있는 위치)를 기준으로 합니다.
 
 ---
 
@@ -184,21 +192,23 @@ docker ps
 
 ### 3. 스키마 파일 못 찾음
 
-**멀티 모듈:**
+**올바른 경로 (멀티 모듈):**
+
 ```kotlin
 // ✅ 올바른 경로
-"testcontainers.postgres.schema-location=project:store-api/sql/schema.sql"
+"testcontainers.postgres.schema-location=project:your-module-name/sql/schema.sql"
 
-// ❌ 잘못된 경로
-"testcontainers.postgres.schema-location=classpath:sql/schema.sql"
+// ❌ 잘못된 경로들
+"testcontainers.postgres.schema-location=classpath:sql/schema.sql"  // 멀티 모듈에서 안 됨!
+"testcontainers.postgres.schema-location=project:sql/schema.sql"     // 모듈 이름 누락!
 ```
 
-**단일 모듈:**
-```kotlin
-// ✅ 올바른 경로
-"testcontainers.postgres.schema-location=classpath:db/schema.sql"
-
-// 파일 위치: src/test/resources/db/schema.sql
+**파일 위치 확인:**
+```
+프로젝트 루트/
+└── your-module-name/
+    └── sql/
+        └── schema.sql  ← 이 파일이 존재해야 함!
 ```
 
 ### 4. DataSource Bean 못 찾음

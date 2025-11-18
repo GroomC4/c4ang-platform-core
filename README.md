@@ -82,10 +82,9 @@ import org.springframework.boot.test.context.SpringBootTest
         "testcontainers.postgres.enabled=true",
         "testcontainers.postgres.replica-enabled=true",
 
-        // 멀티 모듈: project: 스킴 (프로젝트 루트 기준)
+        // project: 스킴 (프로젝트 루트 기준 - 권장!)
         "testcontainers.postgres.schema-location=project:your-module/sql/schema.sql",
-        // 단일 모듈: classpath: 스킴
-        // "testcontainers.postgres.schema-location=classpath:db/schema.sql",
+        //                                                 ↑ 모듈명/sql/schema.sql
 
         "testcontainers.redis.enabled=true",
         "testcontainers.kafka.enabled=true",

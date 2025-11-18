@@ -230,20 +230,15 @@ abstract class IntegrationTestBase
 
 ### Step 3: 스키마 파일 준비
 
-**멀티 모듈 프로젝트 (권장 위치):**
+**스키마 파일 위치 (멀티 모듈):**
 
 ```
-store-api/
-└── sql/
-    └── schema.sql
-```
-
-**단일 모듈 프로젝트:**
-
-```
-src/test/resources/
-└── db/
-    └── schema.sql
+프로젝트 루트/
+├── settings.gradle.kts
+└── store-api/              ← 모듈 디렉토리
+    ├── sql/
+    │   └── schema.sql      ← 여기에 DDL 작성!
+    └── src/
 ```
 
 **schema.sql 예시:**
@@ -263,6 +258,22 @@ CREATE INDEX idx_stores_name ON stores(name);
 
 -- 초기 데이터 (선택사항)
 INSERT INTO stores (name, address) VALUES ('Test Store', 'Seoul');
+```
+
+**IntegrationTestBase에서 경로 지정:**
+
+```kotlin
+@SpringBootTest(
+    properties = [
+        // ✅ 올바른 경로 (프로젝트 루트 기준)
+        "testcontainers.postgres.schema-location=project:store-api/sql/schema.sql",
+
+        // ❌ 잘못된 경로
+        // "testcontainers.postgres.schema-location=classpath:sql/schema.sql"
+        // ↑ 멀티 모듈에서는 동작하지 않음!
+    ]
+)
+abstract class IntegrationTestBase
 ```
 
 ---
@@ -736,49 +747,84 @@ logging:
 
 ## 스키마 파일 경로 가이드
 
-### project: 스킴 (멀티 모듈 권장!)
+### project: 스킴 (멀티 모듈 - 권장!)
 
+**사용법:**
 ```kotlin
-"testcontainers.postgres.schema-location=project:store-api/sql/schema.sql"
+"testcontainers.postgres.schema-location=project:your-module-name/sql/schema.sql"
 ```
 
 **동작 방식:**
-- 프로젝트 루트 = `System.getProperty("user.dir")` = settings.gradle.kts가 있는 위치
-- 프로젝트 루트 + `store-api/sql/schema.sql`
+- `project:` = 프로젝트 루트 (`System.getProperty("user.dir")`)
+- 프로젝트 루트 = settings.gradle.kts가 있는 위치
+- 경로: 프로젝트 루트 + `your-module-name/sql/schema.sql`
 
 **프로젝트 구조:**
 ```
 프로젝트 루트/              ← project: 시작점
-├── settings.gradle.kts
-└── store-api/
+├── settings.gradle.kts     ← 프로젝트 루트를 나타냄
+├── store-api/
+│   └── sql/
+│       └── schema.sql      ← project:store-api/sql/schema.sql
+└── order-api/
     └── sql/
-        └── schema.sql
+        └── schema.sql      ← project:order-api/sql/schema.sql
 ```
 
-### classpath: 스킴 (단일 모듈 권장!)
-
+**예시:**
 ```kotlin
-"testcontainers.postgres.schema-location=classpath:db/schema.sql"
+// store-api 모듈
+"testcontainers.postgres.schema-location=project:store-api/sql/schema.sql"
+
+// order-api 모듈
+"testcontainers.postgres.schema-location=project:order-api/sql/schema.sql"
 ```
 
-**동작 방식:**
-- `src/test/resources/db/schema.sql`
+---
 
-**프로젝트 구조:**
-```
-src/test/resources/
-└── db/
-    └── schema.sql
-```
+### file: 스킴 (절대 경로가 필요한 경우)
 
-### file: 스킴 (특수한 경우)
-
+**사용법:**
 ```kotlin
 "testcontainers.postgres.schema-location=file:/absolute/path/to/schema.sql"
 ```
 
 **동작 방식:**
 - 파일 시스템 절대 경로
+
+**사용 사례:**
+- CI/CD에서 특정 위치의 스키마 파일 사용
+- 외부에서 생성된 스키마 파일 참조
+
+---
+
+### ⚠️ classpath: 스킴 (비권장)
+
+**문제점:**
+```kotlin
+// ❌ 멀티 모듈에서 동작하지 않음!
+"testcontainers.postgres.schema-location=classpath:sql/schema.sql"
+```
+
+**이유:**
+- 멀티 모듈에서 classpath가 모호함
+- `src/test/resources`가 어느 모듈의 것인지 불명확
+- 컴파일된 클래스패스에 의존
+
+**대신 사용:**
+- ✅ `project:` 스킴 사용 (명확함!)
+
+---
+
+### 권장 사항
+
+| 프로젝트 타입 | 권장 스킴 | 스키마 위치 |
+|--------------|----------|------------|
+| **멀티 모듈** | `project:` | `your-module/sql/schema.sql` |
+| **단일 모듈** | `project:` | `sql/schema.sql` |
+| **특수한 경우** | `file:` | 절대 경로 |
+
+> 💡 **팁**: 모든 경우에 `project:` 스킴을 사용하는 것이 가장 명확합니다!
 
 ---
 
