@@ -42,9 +42,11 @@
 
 ## 빠른 시작
 
+### 테스트 환경 (testcontainers-starter)
+
 > 📖 **완전한 가이드**: [QUICK_START.md](QUICK_START.md) (3분 완성!)
 
-### 1. 의존성 추가
+#### 1. 의존성 추가
 
 ```kotlin
 // build.gradle.kts
@@ -64,7 +66,7 @@ dependencies {
 }
 ```
 
-### 2. IntegrationTestBase 생성 ⭐ **필수!**
+#### 2. IntegrationTestBase 생성 ⭐ **필수!**
 
 **위치:** `src/test/kotlin/com/groom/{yourservice}/common/IntegrationTestBase.kt`
 
@@ -93,7 +95,7 @@ import org.springframework.boot.test.context.SpringBootTest
 abstract class IntegrationTestBase
 ```
 
-### 3. 테스트 작성
+#### 3. 테스트 작성
 
 ```kotlin
 import com.groom.yourservice.common.IntegrationTestBase
@@ -121,10 +123,85 @@ class OrderRepositoryTest : IntegrationTestBase() {  // 상속 필수!
 
 **끝!** 컨테이너가 자동으로 시작되고 Primary-Replica 라우팅이 작동합니다.
 
-### 문제 발생 시
+#### 문제 발생 시
 
 - **[트러블슈팅](documents/guides/SERVICE_INTEGRATION_GUIDE.md#트러블슈팅)**
 - **[전체 가이드](documents/guides/SERVICE_INTEGRATION_GUIDE.md)**
+
+---
+
+### 프로덕션 환경 (datasource-starter)
+
+> 📖 **완전한 가이드**: [SERVICE_INTEGRATION_GUIDE.md - 프로덕션 환경](documents/guides/SERVICE_INTEGRATION_GUIDE.md#프로덕션-환경)
+
+#### 1. 의존성 추가
+
+```kotlin
+// build.gradle.kts
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/GroomC4/c4ang-platform-core")
+        credentials {
+            username = System.getenv("GITHUB_ACTOR")
+            password = System.getenv("GITHUB_TOKEN")
+        }
+    }
+}
+
+dependencies {
+    implementation("com.groom.platform:datasource-starter:1.2.2-RC10")
+    runtimeOnly("org.postgresql:postgresql")
+}
+```
+
+#### 2. application.yml 설정
+
+```yaml
+spring:
+  datasource:
+    master:
+      jdbc-url: jdbc:postgresql://master-db-host:5432/your_database
+      username: ${DB_USERNAME}
+      password: ${DB_PASSWORD}
+      hikari:
+        maximum-pool-size: 10
+        minimum-idle: 5
+
+    replica:
+      jdbc-url: jdbc:postgresql://replica-db-host:5432/your_database
+      username: ${DB_USERNAME}
+      password: ${DB_PASSWORD}
+      hikari:
+        maximum-pool-size: 10
+        minimum-idle: 5
+```
+
+#### 3. 서비스에서 사용
+
+```kotlin
+@Service
+class OrderService(
+    private val orderRepository: OrderRepository
+) {
+    @Transactional(readOnly = false)  // PRIMARY DB
+    fun createOrder(request: CreateOrderRequest): Order {
+        return orderRepository.save(Order(...))
+    }
+
+    @Transactional(readOnly = true)  // REPLICA DB
+    fun getOrder(id: Long): Order? {
+        return orderRepository.findById(id).orElse(null)
+    }
+}
+```
+
+**끝!** `@Transactional(readOnly)` 값에 따라 자동으로 Primary/Replica DB로 라우팅됩니다.
+
+#### ⚠️ 주의사항
+
+- **Replication Lag**: Replica DB는 Primary DB보다 데이터가 늦게 반영될 수 있습니다
+- **@Transactional 필수**: 메서드에 @Transactional이 없으면 Primary DB로 라우팅됩니다
+- **Private 메서드**: Spring AOP는 private 메서드에서 작동하지 않습니다
 
 ---
 

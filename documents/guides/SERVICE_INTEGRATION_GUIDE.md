@@ -1,6 +1,6 @@
 # 서비스 통합 가이드 (실전편)
 
-**도메인 서비스에서 testcontainers-starter를 적용하는 완벽 가이드**
+**도메인 서비스에서 platform-core 패키지를 적용하는 완벽 가이드**
 
 > ⚠️ **중요**: 이 가이드는 **멀티 모듈 Gradle 프로젝트**를 기준으로 작성되었습니다.
 > 단일 모듈 프로젝트는 설정이 더 간단하므로 필요한 부분만 참고하세요.
@@ -9,15 +9,23 @@
 
 ## 목차
 
-1. [시작하기 전에](#시작하기-전에)
+### 테스트 환경
+1. [시작하기 전에 (테스트)](#시작하기-전에-테스트)
 2. [필수 준비 사항](#필수-준비-사항)
 3. [통합 테스트 환경 구축 (3단계)](#통합-테스트-환경-구축-3단계)
 4. [테스트 작성](#테스트-작성)
-5. [트러블슈팅](#트러블슈팅)
+
+### 프로덕션 환경
+5. [프로덕션 환경 구축 (3단계)](#프로덕션-환경-구축-3단계)
+6. [프로덕션 사용법](#프로덕션-사용법)
+
+### 공통
+7. [트러블슈팅](#트러블슈팅)
+8. [추가 도움말](#추가-도움말)
 
 ---
 
-## 시작하기 전에
+## 시작하기 전에 (테스트)
 
 ### testcontainers-starter가 제공하는 것
 
@@ -474,6 +482,367 @@ class KafkaProducerTest : IntegrationTestBase() {
 ✅ Replica DataSource configured: jdbc:postgresql://localhost:xxxxx/testdb
 ✅ Routing DataSource configured (MASTER/REPLICA)
 ```
+
+---
+
+# 프로덕션 환경
+
+## 프로덕션 환경 구축 (3단계)
+
+프로덕션 환경에서 Primary-Replica 자동 라우팅을 사용하려면 `datasource-starter`를 적용합니다.
+
+---
+
+### Step 1: 의존성 추가
+
+**build.gradle.kts:**
+
+```kotlin
+repositories {
+    mavenCentral()
+
+    // GitHub Packages 추가
+    maven {
+        name = "GitHubPackages"
+        url = uri("https://maven.pkg.github.com/GroomC4/c4ang-platform-core")
+        credentials {
+            username = System.getenv("GITHUB_ACTOR")
+            password = System.getenv("GITHUB_TOKEN")
+        }
+    }
+}
+
+dependencies {
+    // ✅ 프로덕션용 DataSource 라우팅
+    implementation("com.groom.platform:datasource-starter:1.2.2-RC10")
+
+    // PostgreSQL Driver (필수)
+    runtimeOnly("org.postgresql:postgresql")
+
+    // ⚠️ 주의: testcontainers-starter와 함께 사용하지 마세요!
+    // testImplementation("com.groom.platform:testcontainers-starter:...")  ← 충돌!
+}
+```
+
+---
+
+### Step 2: application.yml 설정
+
+**src/main/resources/application.yml:**
+
+```yaml
+spring:
+  datasource:
+    master:
+      jdbc-url: jdbc:postgresql://master-db-host:5432/production_db
+      username: ${DB_USERNAME}
+      password: ${DB_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+      hikari:
+        maximum-pool-size: 10
+        minimum-idle: 5
+        connection-timeout: 30000
+        idle-timeout: 600000
+        max-lifetime: 1800000
+
+    replica:
+      jdbc-url: jdbc:postgresql://replica-db-host:5432/production_db
+      username: ${DB_USERNAME}
+      password: ${DB_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+      hikari:
+        maximum-pool-size: 20
+        minimum-idle: 10
+        connection-timeout: 30000
+        idle-timeout: 600000
+        max-lifetime: 1800000
+
+# JPA 설정
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate  # 프로덕션에서는 validate만!
+    show-sql: false       # 프로덕션에서는 false
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100
+```
+
+**⚠️ 주의사항:**
+
+1. **DB 비밀번호는 환경 변수로 관리**
+   ```yaml
+   password: ${DB_PASSWORD}  # 환경 변수
+   ```
+
+2. **HikariCP 설정 최적화**
+   - Replica는 Primary보다 더 많은 연결 허용 (읽기 부하가 더 큼)
+   - connection-timeout, idle-timeout 적절히 조정
+
+3. **ddl-auto는 validate만 사용**
+   ```yaml
+   ddl-auto: validate  # create, update 사용 금지!
+   ```
+
+---
+
+### Step 3: DataSourceConfig 클래스 생성 (선택사항)
+
+**기본 설정으로 충분한 경우 생략 가능!**
+
+`datasource-starter`가 자동으로 다음 Bean을 생성합니다:
+- `masterDataSource`
+- `replicaDataSource`
+- `routingDataSource`
+- `dataSource` (Primary Bean)
+
+**커스텀 설정이 필요한 경우:**
+
+```kotlin
+package com.groom.yourservice.config
+
+import com.zaxxer.hikari.HikariDataSource
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties
+import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Profile
+
+@Configuration
+@Profile("!test")  // 테스트 환경 제외
+class DataSourceConfig {
+
+    @Bean
+    @ConfigurationProperties("spring.datasource.master")
+    fun masterDataSourceProperties() = DataSourceProperties()
+
+    @Bean
+    fun masterDataSource(
+        masterDataSourceProperties: DataSourceProperties
+    ): HikariDataSource {
+        return masterDataSourceProperties
+            .initializeDataSourceBuilder()
+            .type(HikariDataSource::class.java)
+            .build()
+            .apply {
+                // 추가 설정 (선택사항)
+                poolName = "MasterHikariPool"
+                isReadOnly = false
+            }
+    }
+
+    @Bean
+    @ConfigurationProperties("spring.datasource.replica")
+    fun replicaDataSourceProperties() = DataSourceProperties()
+
+    @Bean
+    fun replicaDataSource(
+        replicaDataSourceProperties: DataSourceProperties
+    ): HikariDataSource {
+        return replicaDataSourceProperties
+            .initializeDataSourceBuilder()
+            .type(HikariDataSource::class.java)
+            .build()
+            .apply {
+                // 추가 설정 (선택사항)
+                poolName = "ReplicaHikariPool"
+                isReadOnly = true  // Replica는 읽기 전용
+            }
+    }
+}
+```
+
+**⚠️ 주의:**
+- `routingDataSource`와 `dataSource` Bean은 **절대 직접 생성하지 마세요!**
+- `datasource-starter`가 자동으로 생성합니다
+
+---
+
+## 프로덕션 사용법
+
+### 1. 기본 사용법
+
+**자동 라우팅:**
+
+```kotlin
+@Service
+class StoreService(
+    private val storeRepository: StoreRepository
+) {
+    @Transactional(readOnly = false)  // PRIMARY DB
+    fun createStore(name: String): Store {
+        return storeRepository.save(Store(name = name))
+    }
+
+    @Transactional(readOnly = true)  // REPLICA DB
+    fun getStore(id: Long): Store? {
+        return storeRepository.findById(id).orElse(null)
+    }
+
+    @Transactional(readOnly = true)  // REPLICA DB
+    fun getAllStores(): List<Store> {
+        return storeRepository.findAll()
+    }
+}
+```
+
+**동작 방식:**
+- `@Transactional(readOnly = false)` → **PRIMARY DB** 사용
+- `@Transactional(readOnly = true)` → **REPLICA DB** 사용
+- `@Transactional` (기본값) → **PRIMARY DB** 사용
+
+---
+
+### 2. Controller 예시
+
+```kotlin
+@RestController
+@RequestMapping("/api/stores")
+class StoreController(
+    private val storeService: StoreService
+) {
+    @PostMapping
+    fun createStore(@RequestBody request: CreateStoreRequest): StoreResponse {
+        val store = storeService.createStore(request.name)  // PRIMARY DB
+        return StoreResponse.from(store)
+    }
+
+    @GetMapping("/{id}")
+    fun getStore(@PathVariable id: Long): StoreResponse {
+        val store = storeService.getStore(id)  // REPLICA DB
+            ?: throw NotFoundException("Store not found")
+        return StoreResponse.from(store)
+    }
+
+    @GetMapping
+    fun getAllStores(): List<StoreResponse> {
+        return storeService.getAllStores()  // REPLICA DB
+            .map { StoreResponse.from(it) }
+    }
+}
+```
+
+---
+
+### 3. 복잡한 트랜잭션
+
+**쓰기 작업 후 바로 읽기:**
+
+```kotlin
+@Transactional(readOnly = false)  // PRIMARY 사용 (일관성 보장)
+fun createAndReturn(name: String): Store {
+    val store = storeRepository.save(Store(name = name))
+
+    // 같은 트랜잭션 내에서는 PRIMARY DB 사용
+    return storeRepository.findById(store.id!!).get()
+}
+```
+
+**읽기 전용 트랜잭션 내에서 쓰기 시도 (에러!):**
+
+```kotlin
+@Transactional(readOnly = true)  // REPLICA DB
+fun wrongUsage(id: Long) {
+    val store = storeRepository.findById(id).get()
+    store.name = "Updated"
+    storeRepository.save(store)  // ❌ 에러 발생! (REPLICA는 읽기 전용)
+}
+```
+
+---
+
+### 4. 주의사항
+
+#### ⚠️ Replication Lag
+
+**문제:**
+```kotlin
+@Transactional(readOnly = false)
+fun updateStore(id: Long, name: String) {
+    val store = storeRepository.findById(id).get()
+    store.name = name
+    storeRepository.save(store)  // PRIMARY에 저장
+}
+
+@Transactional(readOnly = true)
+fun getUpdatedStore(id: Long): Store {
+    // REPLICA에서 조회 - 복제 지연으로 인해 이전 데이터가 나올 수 있음!
+    return storeRepository.findById(id).get()
+}
+```
+
+**해결:**
+```kotlin
+// 방법 1: 쓰기 후 바로 읽어야 하면 readOnly = false 사용
+@Transactional(readOnly = false)
+fun updateAndReturn(id: Long, name: String): Store {
+    val store = storeRepository.findById(id).get()
+    store.name = name
+    return storeRepository.save(store)  // PRIMARY에서 저장 및 조회
+}
+
+// 방법 2: 적절한 대기 시간 또는 비동기 처리
+```
+
+#### ⚠️ @Transactional 누락
+
+```kotlin
+// ❌ 잘못된 코드
+fun getStore(id: Long): Store {  // @Transactional 없음!
+    return storeRepository.findById(id).get()
+    // PRIMARY DB 사용! (기본값)
+}
+
+// ✅ 올바른 코드
+@Transactional(readOnly = true)
+fun getStore(id: Long): Store {
+    return storeRepository.findById(id).get()
+    // REPLICA DB 사용
+}
+```
+
+#### ⚠️ Private 메서드
+
+```kotlin
+class StoreService {
+    // ❌ @Transactional이 적용되지 않음!
+    @Transactional(readOnly = true)
+    private fun getStore(id: Long): Store {
+        return storeRepository.findById(id).get()
+    }
+
+    // ✅ Public 메서드에만 적용됨
+    @Transactional(readOnly = true)
+    fun getStore(id: Long): Store {
+        return storeRepository.findById(id).get()
+    }
+}
+```
+
+---
+
+### 5. 모니터링
+
+**HikariCP 메트릭 확인:**
+
+```yaml
+# application.yml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+```
+
+**주요 메트릭:**
+- `hikaricp.connections.active` - 활성 연결 수
+- `hikaricp.connections.idle` - 유휴 연결 수
+- `hikaricp.connections.pending` - 대기 중인 연결 수
 
 ---
 
