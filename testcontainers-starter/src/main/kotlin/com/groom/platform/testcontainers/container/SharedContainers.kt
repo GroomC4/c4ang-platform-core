@@ -54,7 +54,7 @@ object SharedContainers {
             .withDatabaseName("testdb")
             .withUsername("test")
             .withPassword("test")
-            .withReuse(true)
+            .withReuse(false)  // 매번 새로운 컨테이너로 스키마 재적용 보장
             // Note: Do NOT call start() here!
             // The container will be started after schema configuration in TestcontainersAutoConfiguration
     }
@@ -66,7 +66,7 @@ object SharedContainers {
         println("🚀 Starting shared Redis container...")
         GenericContainer(DockerImageName.parse("redis:7-alpine"))
             .withExposedPorts(6379)
-            .withReuse(true)
+            .withReuse(false)  // 매번 새로운 컨테이너로 깨끗한 환경 보장
             .apply {
                 start()
                 println("✅ Redis container started and ready (${this.host}:${this.getMappedPort(6379)})")
@@ -95,7 +95,7 @@ object SharedContainers {
             .withEnv("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "true")
             .withEnv("KAFKA_NUM_PARTITIONS", "1")
             .withEnv("KAFKA_DEFAULT_REPLICATION_FACTOR", "1")
-            .withReuse(true)
+            .withReuse(false)  // 매번 새로운 컨테이너로 깨끗한 환경 보장
             .apply {
                 start()
                 println("✅ Kafka container started and ready (${this.bootstrapServers})")
@@ -159,7 +159,7 @@ object SharedContainers {
                     .forStatusCode(200)
                     .withStartupTimeout(java.time.Duration.ofSeconds(60))
             )
-            .withReuse(true)
+            .withReuse(false)  // 매번 새로운 컨테이너로 깨끗한 환경 보장
             .apply {
                 start()
                 val schemaRegistryUrl = "http://${this.host}:${this.getMappedPort(8081)}"

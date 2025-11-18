@@ -62,5 +62,9 @@ subprojects {
 
     tasks.named<Jar>("jar") {
         enabled = true
+        // Remove -plain suffix from jar filename
+        // Without this, Spring Boot plugin adds "-plain" suffix
+        // Result: testcontainers-starter-1.2.2-RC10.jar (not -plain.jar)
+        archiveClassifier.set("")
     }
 }
