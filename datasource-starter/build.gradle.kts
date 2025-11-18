@@ -1,4 +1,8 @@
 dependencies {
+    // Platform DataSource Core
+    // api로 노출하여 서비스에서 DynamicRoutingDataSource, DataSourceType 사용 가능
+    api(project(":datasource-core"))
+
     // Spring Boot
     api("org.springframework.boot:spring-boot-starter-data-jpa:3.3.4")
     api("org.springframework.boot:spring-boot-starter-jdbc:3.3.4")

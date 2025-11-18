@@ -57,11 +57,14 @@ repositories {
 }
 
 dependencies {
-    // 테스트용 (필수)
-    testImplementation("com.groom.platform:testcontainers-starter:1.0.0-SNAPSHOT")
+    // ⭐ 중요: 프로덕션과 테스트 환경에서 각각 하나만 사용하세요!
 
-    // 프로덕션용 (선택)
-    implementation("com.groom.platform:datasource-starter:1.0.0-SNAPSHOT")
+    // 프로덕션용 (선택) - Primary-Replica 라우팅 필요 시
+    implementation("com.groom.platform:datasource-starter:1.2.2-RC2")
+
+    // 테스트용 (필수) - Testcontainers 자동 구성
+    // ⚠️ datasource-starter와 함께 사용하지 마세요 (순환 참조 발생)
+    testImplementation("com.groom.platform:testcontainers-starter:1.2.2-RC2")
 }
 ```
 
@@ -115,12 +118,15 @@ class OrderRepositoryTest {
 
 ```
 c4ang-platform-core/
-├── datasource-starter/              # 프로덕션용 DataSource 라우팅
+├── datasource-core/                 # ⭐ 공통 DataSource 클래스 (순수 라이브러리)
 │   └── src/main/kotlin/com/groom/platform/datasource/
-│       ├── DynamicRoutingDataSource.kt
-│       └── autoconfigure/
-│           ├── DataSourceAutoConfiguration.kt
-│           └── PlatformDataSourceProperties.kt
+│       ├── DynamicRoutingDataSource.kt      # Primary-Replica 라우팅 로직
+│       └── DataSourceType.kt                # MASTER/REPLICA enum
+│
+├── datasource-starter/              # 프로덕션용 DataSource 라우팅
+│   └── src/main/kotlin/com/groom/platform/datasource/autoconfigure/
+│       ├── DataSourceAutoConfiguration.kt   # Spring Boot Auto-Configuration
+│       └── PlatformDataSourceProperties.kt
 │
 ├── testcontainers-starter/          # 테스트용 Testcontainers 자동화
 │   └── src/main/kotlin/com/groom/platform/testcontainers/
@@ -144,15 +150,26 @@ c4ang-platform-core/
     └── base/                        # Redis 개별 실행
 ```
 
-### datasource-starter
+### datasource-core
 
-**목적:** 프로덕션 환경에서 Primary-Replica 패턴 지원
+**목적:** DataSource 라우팅 핵심 클래스 제공 (AutoConfiguration 없음)
 
 **제공 클래스:**
 - `DynamicRoutingDataSource`: @Transactional(readOnly) 기반 자동 라우팅
 - `DataSourceType`: MASTER/REPLICA enum
-- `DataSourceAutoConfiguration`: Spring Boot Auto-Configuration
 
+**사용 대상:** datasource-starter와 testcontainers-starter의 공통 의존성
+**특징:** Spring Boot AutoConfiguration 없음, 순수 클래스만 포함
+
+### datasource-starter
+
+**목적:** 프로덕션 환경에서 Primary-Replica 패턴 지원
+
+**제공 기능:**
+- `DataSourceAutoConfiguration`: Spring Boot Auto-Configuration
+- datasource-core를 통한 DynamicRoutingDataSource 제공
+
+**의존성:** datasource-core (api)
 **사용 대상:** 모든 마이크로서비스 (프로덕션)
 
 ### testcontainers-starter
@@ -164,9 +181,10 @@ c4ang-platform-core/
 - Redis 자동 시작
 - Kafka 자동 시작
 - Schema Registry 자동 시작 (Kafka Avro 직렬화 지원)
-- DataSource 자동 구성
+- DataSource 자동 구성 (TestDataSourceAutoConfiguration)
 - application-test.yml 기반 설정
 
+**의존성:** datasource-core (api) - ⚠️ datasource-starter 제외 (순환 참조 방지)
 **사용 대상:** 모든 마이크로서비스 (테스트)
 
 ---
