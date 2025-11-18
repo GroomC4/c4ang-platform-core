@@ -23,6 +23,13 @@ import org.testcontainers.utility.DockerImageName
  */
 object SharedContainers {
     /**
+     * 컨테이너 간 통신을 위한 공유 네트워크
+     */
+    private val network: org.testcontainers.containers.Network by lazy {
+        org.testcontainers.containers.Network.newNetwork()
+    }
+
+    /**
      * PostgreSQL Primary 컨테이너 (싱글톤)
      *
      * lazy 초기화: 처음 사용될 때 한 번만 시작됩니다.
@@ -77,6 +84,8 @@ object SharedContainers {
     val kafkaContainer: KafkaContainer by lazy {
         println("🚀 Starting shared Kafka container...")
         KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.1"))
+            .withNetwork(network)
+            .withNetworkAliases("kafka")
             .withReuse(true)
             .apply {
                 start()
@@ -101,12 +110,14 @@ object SharedContainers {
         val kafka = kafkaContainer
 
         GenericContainer(DockerImageName.parse("confluentinc/cp-schema-registry:7.5.1"))
+            .withNetwork(network)
+            .withNetworkAliases("schema-registry")
             .withExposedPorts(8081)
             .withEnv("SCHEMA_REGISTRY_HOST_NAME", "schema-registry")
             .withEnv("SCHEMA_REGISTRY_LISTENERS", "http://0.0.0.0:8081")
             .withEnv(
                 "SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS",
-                "PLAINTEXT://${kafka.host}:${kafka.firstMappedPort}"
+                "PLAINTEXT://kafka:9092"  // Network alias 사용
             )
             // ===== _schemas 토픽 안정성 설정 =====
             // 테스트 환경: 단일 브로커이므로 replication.factor=1
@@ -128,6 +139,14 @@ object SharedContainers {
             // 다른 옵션: FORWARD, FULL, NONE
             .withEnv("SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL", "BACKWARD")
 
+            // Wait strategy: Schema Registry가 완전히 준비될 때까지 대기
+            .waitingFor(
+                org.testcontainers.containers.wait.strategy.HttpWaitStrategy()
+                    .forPath("/subjects")
+                    .forPort(8081)
+                    .forStatusCode(200)
+                    .withStartupTimeout(java.time.Duration.ofSeconds(60))
+            )
             .withReuse(true)
             .apply {
                 start()
