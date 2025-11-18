@@ -72,9 +72,15 @@ class TestcontainersAutoConfiguration(
         val postgres = properties.postgres
         val container = SharedContainers.postgresContainer
 
+        println("🔍 [DEBUG] PostgreSQL Container Status:")
+        println("  - isRunning: ${container.isRunning}")
+        println("  - schemaLocation: ${postgres.schemaLocation}")
+
         // 스키마 파일 자동 로딩 (이미 시작된 컨테이너인 경우 스킵)
         if (!container.isRunning) {
+            println("🔍 [DEBUG] Container not running, proceeding with schema setup...")
             postgres.schemaLocation?.let { schemaPath ->
+                println("🔍 [DEBUG] Schema path found: $schemaPath")
                 when {
                     schemaPath.startsWith("project:") -> {
                         // project: 프로토콜 - 프로젝트 루트 기준 상대 경로
@@ -111,8 +117,13 @@ class TestcontainersAutoConfiguration(
             container.start()
             println("✅ PostgreSQL Primary container started and ready (${container.jdbcUrl})")
         } else {
+            println("🔍 [DEBUG] Container already running - schema setup skipped!")
             println("✅ PostgreSQL Primary container already running (${container.jdbcUrl})")
         }
+
+        postgres.schemaLocation?.let {
+            println("🔍 [DEBUG] After setup - schemaLocation was: $it")
+        } ?: println("🔍 [DEBUG] After setup - schemaLocation was NULL")
 
         return container
     }
