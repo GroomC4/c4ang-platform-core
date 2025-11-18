@@ -42,6 +42,8 @@
 
 ## 빠른 시작
 
+> 📖 **완전한 가이드**: [QUICK_START.md](QUICK_START.md) (3분 완성!)
+
 ### 1. 의존성 추가
 
 ```kotlin
@@ -57,58 +59,58 @@ repositories {
 }
 
 dependencies {
-    // ⭐ 중요: 프로덕션과 테스트 환경에서 각각 하나만 사용하세요!
-
-    // 프로덕션용 (선택) - Primary-Replica 라우팅 필요 시
-    implementation("com.groom.platform:datasource-starter:1.2.2-RC2")
-
-    // 테스트용 (필수) - Testcontainers 자동 구성
-    // ⚠️ datasource-starter와 함께 사용하지 마세요 (순환 참조 발생)
-    testImplementation("com.groom.platform:testcontainers-starter:1.2.2-RC2")
+    testImplementation("com.groom.platform:testcontainers-starter:1.2.2-RC10")
+    runtimeOnly("org.postgresql:postgresql")
 }
 ```
 
-### 2. 테스트 설정
+### 2. IntegrationTestBase 생성 ⭐ **필수!**
 
-```yaml
-# src/test/resources/application-test.yml
-testcontainers:
-  postgres:
-    enabled: true
-    replica-enabled: true
-    # 스키마 파일 위치 지정 (3가지 방법 지원)
-    # 1. 프로젝트 루트 기준: project:{모듈명}/sql/schema.sql (멀티모듈 권장!)
-    #    - 프로젝트 루트 = settings.gradle.kts가 있는 위치
-    #    - 모듈 루트가 아님!
-    # 2. classpath 리소스: classpath:db/schema.sql (단일 모듈)
-    # 3. 절대 경로: file:/absolute/path/to/schema.sql (특수한 경우)
-    schema-location: project:store-api/sql/schema.sql
-  redis:
-    enabled: true
-  kafka:
-    enabled: true
-  schema-registry:
-    enabled: true
+**위치:** `src/test/kotlin/com/groom/{yourservice}/common/IntegrationTestBase.kt`
+
+```kotlin
+package com.groom.yourservice.common
+
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
+
+@SpringBootTest(
+    properties = [
+        "testcontainers.postgres.enabled=true",
+        "testcontainers.postgres.replica-enabled=true",
+
+        // 멀티 모듈: project: 스킴 (프로젝트 루트 기준)
+        "testcontainers.postgres.schema-location=project:your-module/sql/schema.sql",
+        // 단일 모듈: classpath: 스킴
+        // "testcontainers.postgres.schema-location=classpath:db/schema.sql",
+
+        "testcontainers.redis.enabled=true",
+        "testcontainers.kafka.enabled=true",
+    ]
+)
+@ActiveProfiles("test")
+abstract class IntegrationTestBase
 ```
 
 ### 3. 테스트 작성
 
 ```kotlin
-@SpringBootTest
-class OrderRepositoryTest {
+import com.groom.yourservice.common.IntegrationTestBase
+
+class OrderRepositoryTest : IntegrationTestBase() {  // 상속 필수!
 
     @Autowired
     private lateinit var orderRepository: OrderRepository
 
     @Test
-    @Transactional(readOnly = false)  // MASTER DB 사용
+    @Transactional(readOnly = false)  // PRIMARY DB
     fun `주문 생성 테스트`() {
         val order = orderRepository.save(Order(...))
         assert(order.id != null)
     }
 
     @Test
-    @Transactional(readOnly = true)  // REPLICA DB 사용
+    @Transactional(readOnly = true)  // REPLICA DB
     fun `주문 조회 테스트`() {
         val orders = orderRepository.findAll()
         assert(orders is List)
@@ -117,6 +119,11 @@ class OrderRepositoryTest {
 ```
 
 **끝!** 컨테이너가 자동으로 시작되고 Primary-Replica 라우팅이 작동합니다.
+
+### 문제 발생 시
+
+- **[트러블슈팅](documents/guides/SERVICE_INTEGRATION_GUIDE.md#트러블슈팅)**
+- **[전체 가이드](documents/guides/SERVICE_INTEGRATION_GUIDE.md)**
 
 ---
 
