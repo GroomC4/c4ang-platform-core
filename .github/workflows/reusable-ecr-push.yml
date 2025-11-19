@@ -101,7 +101,7 @@ jobs:
     secrets: inherit # GROOM_GITHUB_ACTION_TOKEN 전달
 
     # 1번 Job이 끝난 후, 2번 Job은 reusable-update-config.yml을 호출
-    uses: ./.github/workflows/reusable-update-config.yml
+    uses: GroomC4/c4ang-platform-core/.github/workflows/reusable-update-config.yml@v1.2.9
     with:
       # 1번 Job(build-and-push)의 결과(outputs)를 전달
       service_slug: "${{ github.event.repository.name }}"
