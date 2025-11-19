@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration as SpringDataSourceAutoConfiguration
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Lazy
 import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy
 import javax.sql.DataSource
@@ -62,8 +63,11 @@ class DataSourceAutoConfiguration {
      * 주의: master/replica DataSource Bean은 각 서비스에서 생성해야 합니다.
      * 이 메서드는 @ConditionalOnMissingBean으로 설정되어 있어,
      * 서비스에서 직접 routingDataSource Bean을 정의하면 이 Bean은 생성되지 않습니다.
+     *
+     * @Lazy를 사용하여 순환 참조 문제를 방지합니다.
      */
     @Bean
+    @Lazy
     @ConditionalOnMissingBean(name = ["routingDataSource"])
     fun routingDataSource(
         dataSources: Map<String, DataSource>,
