@@ -15,6 +15,11 @@ dependencies {
 
     // Optional dependencies
     compileOnly("org.postgresql:postgresql")
+
+    // Test dependencies
+    testImplementation("org.springframework.boot:spring-boot-starter-test:3.3.4")
+    testImplementation("org.springframework.boot:spring-boot-test-autoconfigure:3.3.4")
+    testRuntimeOnly("com.h2database:h2")
 }
 
 publishing {
