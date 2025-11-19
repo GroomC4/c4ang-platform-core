@@ -2,13 +2,13 @@ package com.groom.platform.datasource.autoconfigure
 
 import com.groom.platform.datasource.DataSourceType
 import com.groom.platform.datasource.DynamicRoutingDataSource
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration as SpringDataSourceAutoConfiguration
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Lazy
 import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy
 import javax.sql.DataSource
@@ -51,7 +51,10 @@ import javax.sql.DataSource
  *     replica-enabled: true
  * ```
  */
-@AutoConfiguration(before = [SpringDataSourceAutoConfiguration::class])
+@AutoConfiguration(
+    before = [SpringDataSourceAutoConfiguration::class],
+    after = [DataSourceDefaultConfiguration::class]
+)
 @ConditionalOnClass(DataSource::class)
 @EnableConfigurationProperties(PlatformDataSourceProperties::class)
 @org.springframework.context.annotation.Profile("!test")  // ⭐ 테스트 환경에서는 비활성화
@@ -60,39 +63,17 @@ class DataSourceAutoConfiguration {
     /**
      * Routing DataSource Bean 생성
      *
-     * 주의: master/replica DataSource Bean은 각 서비스에서 생성해야 합니다.
-     * 이 메서드는 @ConditionalOnMissingBean으로 설정되어 있어,
-     * 서비스에서 직접 routingDataSource Bean을 정의하면 이 Bean은 생성되지 않습니다.
+     * 주의: master/replica DataSource Bean은 각 서비스에서 생성하거나
+     * DataSourceDefaultConfiguration에서 자동으로 생성됩니다.
      *
-     * @Lazy를 사용하여 순환 참조 문제를 방지합니다.
+     * @Qualifier를 사용하여 명시적으로 주입받아 순환 참조 문제를 해결합니다.
      */
     @Bean
-    @Lazy
     @ConditionalOnMissingBean(name = ["routingDataSource"])
     fun routingDataSource(
-        dataSources: Map<String, DataSource>,
+        @Qualifier("masterDataSource") masterDataSource: DataSource,
+        @Qualifier("replicaDataSource") replicaDataSource: DataSource,
     ): DataSource {
-        // "masterDataSource"와 "replicaDataSource" Bean을 찾아서 설정
-        val masterDataSource = dataSources["masterDataSource"]
-            ?: throw IllegalStateException(
-                """
-                Master DataSource not found!
-                Please define 'masterDataSource' bean in your configuration:
-
-                @Bean
-                @ConfigurationProperties("spring.datasource.master")
-                fun masterDataSourceProperties() = DataSourceProperties()
-
-                @Bean
-                fun masterDataSource(@Qualifier("masterDataSourceProperties") properties: DataSourceProperties): DataSource {
-                    return properties.initializeDataSourceBuilder().type(HikariDataSource::class.java).build()
-                }
-                """.trimIndent(),
-            )
-
-        val replicaDataSource = dataSources["replicaDataSource"]
-            ?: masterDataSource // Replica가 없으면 Master 사용
-
         val router = DynamicRoutingDataSource()
         router.setTargetDataSources(
             mapOf(

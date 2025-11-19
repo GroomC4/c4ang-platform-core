@@ -1,1 +1,2 @@
+com.groom.platform.datasource.autoconfigure.DataSourceDefaultConfiguration
 com.groom.platform.datasource.autoconfigure.DataSourceAutoConfiguration
