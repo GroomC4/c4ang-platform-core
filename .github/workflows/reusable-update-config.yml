@@ -38,17 +38,18 @@ jobs:
 
       - name: Update Helm values.yaml
         working-directory: config-repo
+        env:
+          NEW_TAG: ${{ inputs.image_tag }}
         run: |
           # c4ang- 접두사 제거 (예: c4ang-customer-service -> customer-service)
           ORIGINAL_SLUG="${{ inputs.service_slug }}"
           SERVICE_SLUG="${ORIGINAL_SLUG#c4ang-}"
-          NEW_TAG="${{ inputs.image_tag }}"
 
           # helm/services/customer-service/values.yaml 경로 사용
-          VALUES_FILE="helm/services/$SERVICE_SLUG/values.yaml" 
-          
-          echo "Updating file: $VALUES_FILE with tag: $NEW_TAG"
-          
+          VALUES_FILE="helm/services/$SERVICE_SLUG/values.yaml"
+
+          echo "Updating file: $VALUES_FILE with tag: ${{ inputs.image_tag }}"
+
           # yq를 사용하여 'image.tag' 필드 업데이트
           yq -i '.image.tag = env(NEW_TAG)' "$VALUES_FILE"
 
