@@ -1,0 +1,31 @@
+spring:
+  profiles:
+    active: test
+
+platform:
+  local-dev:
+    enabled: false  # Disabled by default for tests
+    auto-start: false
+    auto-stop: false
+    project-name: test-local-dev
+    health-check-timeout: 10s
+    services:
+      postgres:
+        enabled: true
+        primary-port: 35432
+        replica-port: 35433
+        database: test_db
+        username: test_user
+        password: test_password
+      redis:
+        enabled: true
+        port: 36379
+      kafka:
+        enabled: true
+        port: 39092
+        schema-registry-port: 38081
+
+logging:
+  level:
+    root: WARN
+    com.groom.platform.localdev: DEBUG
