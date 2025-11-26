@@ -9,9 +9,6 @@ on:
       - 'testcontainers-starter/**'
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
-  release:
-    types: [published]
-  workflow_dispatch:
 
 jobs:
   build-and-publish:
