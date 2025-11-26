@@ -39,7 +39,7 @@ jobs:
         with:
           name: test-results
           path: |
-            datasource-starter/build/test-results/
+            platform-core/build/test-results/
             testcontainers-starter/build/test-results/
           retention-days: 7
 
@@ -49,6 +49,6 @@ jobs:
         with:
           name: build-reports
           path: |
-            datasource-starter/build/reports/
+            platform-core/build/reports/
             testcontainers-starter/build/reports/
           retention-days: 7

@@ -1,0 +1,2 @@
+com.groom.platform.autoconfigure.PlatformAutoConfiguration
+com.groom.platform.autoconfigure.DataSourceConfiguration

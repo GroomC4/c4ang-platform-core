@@ -1,45 +1,45 @@
 dependencies {
-    // Platform Core (새 통합 모듈)
-    // DynamicRoutingDataSource, DataSourceType 클래스 사용
-    api(project(":platform-core"))
-
     // Spring Boot
     api("org.springframework.boot:spring-boot-starter-data-jpa:3.3.4")
-    api("org.springframework.boot:spring-boot-starter-data-redis:3.3.4")
-    api("org.springframework.boot:spring-boot-starter-test:3.3.4")
+    api("org.springframework.boot:spring-boot-starter-jdbc:3.3.4")
 
-    // Testcontainers
-    api("org.testcontainers:testcontainers:1.19.3")
-    api("org.testcontainers:postgresql:1.19.3")
-    api("org.testcontainers:kafka:1.19.3")
-    api("org.testcontainers:junit-jupiter:1.19.3")
-
-    // Kafka
-    api("org.springframework.kafka:spring-kafka:3.3.0")
-
-    // Configuration Processor
+    // Configuration Processor (for yml autocomplete)
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor:3.3.4")
 
-    // PostgreSQL Driver
+    // HikariCP (already included in spring-boot-starter-jdbc)
+    api("com.zaxxer:HikariCP")
+
+    // PostgreSQL Driver (optional - provided by domain service)
     compileOnly("org.postgresql:postgresql")
 
-    // Redis
-    api("org.springframework.data:spring-data-redis:3.3.4")
-    api("io.lettuce:lettuce-core:6.3.2.RELEASE")
+    // Redis (optional)
+    compileOnly("org.springframework.boot:spring-boot-starter-data-redis:3.3.4")
+
+    // Kafka (optional)
+    compileOnly("org.springframework.kafka:spring-kafka:3.3.0")
+
+    // Test dependencies
+    testImplementation("org.springframework.boot:spring-boot-starter-test:3.3.4")
+    testRuntimeOnly("com.h2database:h2")
+
+    // Testcontainers (test scope only)
+    testImplementation("org.testcontainers:testcontainers:1.19.7")
+    testImplementation("org.testcontainers:postgresql:1.19.7")
+    testImplementation("org.testcontainers:junit-jupiter:1.19.7")
 }
 
 publishing {
     publications {
         create<MavenPublication>("maven") {
             groupId = "com.groom.platform"
-            artifactId = "testcontainers-starter"
+            artifactId = "platform-core"
             version = project.version.toString()
 
             from(components["java"])
 
             pom {
-                name.set("Platform Testcontainers Spring Boot Starter")
-                description.set("Testcontainers auto-configuration for integration tests with Primary-Replica support")
+                name.set("Platform Core")
+                description.set("Unified platform core for datasource routing, local dev infrastructure, and test support")
                 url.set("https://github.com/GroomC4/c4ang-platform-core")
 
                 licenses {

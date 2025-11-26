@@ -1,11 +1,11 @@
-name: Publish Starters to GitHub Packages
+name: Publish to GitHub Packages
 
 on:
   push:
     tags:
       - 'v*'
     paths:
-      - 'datasource-starter/**'
+      - 'platform-core/**'
       - 'testcontainers-starter/**'
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
@@ -31,11 +31,11 @@ jobs:
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
             echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "📦 Using version from tag: $VERSION"
+            echo "Using version from tag: $VERSION"
           else
-            VERSION="1.2.1-SNAPSHOT"
+            VERSION="2.0.0-SNAPSHOT"
             echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "⚠️ Not a tag push, using default version: $VERSION"
+            echo "Not a tag push, using default version: $VERSION"
           fi
 
       - name: Set up JDK 21
@@ -63,6 +63,6 @@ jobs:
         with:
           name: build-artifacts
           path: |
-            datasource-starter/build/libs/
+            platform-core/build/libs/
             testcontainers-starter/build/libs/
           retention-days: 7
