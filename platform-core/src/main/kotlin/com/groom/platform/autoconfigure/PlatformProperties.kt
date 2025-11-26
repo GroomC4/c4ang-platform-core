@@ -80,7 +80,17 @@ data class RedisProperties(
 
 data class KafkaProperties(
     val enabled: Boolean = true,
-    val port: Int = 9092
+    val port: Int = 9092,
+    /**
+     * Schema Registry 설정
+     * Kafka 활성화 시 함께 활성화됨
+     */
+    val schemaRegistry: SchemaRegistryProperties = SchemaRegistryProperties()
+)
+
+data class SchemaRegistryProperties(
+    val enabled: Boolean = true,
+    val port: Int = 8081
 )
 
 data class DataSourceProperties(

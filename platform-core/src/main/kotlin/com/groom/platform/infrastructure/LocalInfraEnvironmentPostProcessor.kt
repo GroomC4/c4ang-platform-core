@@ -30,6 +30,7 @@ import java.io.File
  * - spring.data.redis.host
  * - spring.data.redis.port
  * - spring.kafka.bootstrap-servers
+ * - spring.kafka.properties.schema.registry.url
  *
  * **동작 조건:**
  * - spring.profiles.active=local
@@ -89,6 +90,9 @@ class LocalInfraEnvironmentPostProcessor : EnvironmentPostProcessor {
             }
             if (properties.infrastructure.kafka.enabled) {
                 logger.info { "   - Kafka: ${dynamicProperties["spring.kafka.bootstrap-servers"]}" }
+                if (properties.infrastructure.kafka.schemaRegistry.enabled) {
+                    logger.info { "   - Schema Registry: ${dynamicProperties["spring.kafka.properties.schema.registry.url"]}" }
+                }
             }
 
         } catch (e: Exception) {
@@ -167,10 +171,16 @@ class LocalInfraEnvironmentPostProcessor : EnvironmentPostProcessor {
             props["spring.data.redis.port"] = redisPort
         }
 
-        // Kafka
+        // Kafka (고정 포트 사용 - advertised.listeners 문제로 동적 포트 불가)
         if (properties.infrastructure.kafka.enabled) {
-            val kafkaPort = manager.getServicePort("kafka", 9092)
+            val kafkaPort = properties.infrastructure.kafka.port
             props["spring.kafka.bootstrap-servers"] = "localhost:$kafkaPort"
+
+            // Schema Registry (고정 포트 사용)
+            if (properties.infrastructure.kafka.schemaRegistry.enabled) {
+                val schemaRegistryPort = properties.infrastructure.kafka.schemaRegistry.port
+                props["spring.kafka.properties.schema.registry.url"] = "http://localhost:$schemaRegistryPort"
+            }
         }
 
         return props

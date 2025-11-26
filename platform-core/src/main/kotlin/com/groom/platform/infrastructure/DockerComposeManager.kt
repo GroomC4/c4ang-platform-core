@@ -127,6 +127,10 @@ class DockerComposeManager(
             }
             if (properties.kafka.enabled) {
                 add("kafka")
+                // Schema Registry는 Kafka와 함께 활성화
+                if (properties.kafka.schemaRegistry.enabled) {
+                    add("schema-registry")
+                }
             }
         }
     }
