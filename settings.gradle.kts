@@ -1,6 +1,4 @@
 rootProject.name = "c4ang-platform-core"
 
-include("datasource-core")
-include("datasource-starter")
+include("platform-core")
 include("testcontainers-starter")
-include("local-dev-starter")

@@ -1,0 +1,4 @@
+com.groom.platform.autoconfigure.PlatformAutoConfiguration
+com.groom.platform.autoconfigure.DataSourceConfiguration
+com.groom.platform.autoconfigure.RedisConfiguration
+com.groom.platform.autoconfigure.KafkaConfiguration
