@@ -55,7 +55,7 @@ jobs:
         run: ./gradlew publish -Pversion=${{ steps.version.outputs.version }}
         env:
           GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GROOM_GITHUB_ACTION_TOKEN }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

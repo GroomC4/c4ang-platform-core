@@ -30,8 +30,8 @@ dependencies {
 
 publishing {
     publications {
-        create<MavenPublication>("maven") {
-            groupId = "com.groom.platform"
+        create<MavenPublication>("gpr") {
+            groupId = "io.github.groomc4"
             artifactId = "platform-core"
             version = project.version.toString()
 
@@ -51,9 +51,8 @@ publishing {
 
                 developers {
                     developer {
-                        id.set("groom")
-                        name.set("Groom Team")
-                        email.set("dev@groom.com")
+                        id.set("GroomC4")
+                        name.set("GroomC4 Team")
                     }
                 }
 
@@ -67,12 +66,14 @@ publishing {
     }
 
     repositories {
+        mavenLocal()
+
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/GroomC4/c4ang-platform-core")
+            url = uri("https://maven.pkg.github.com/GroomC4/c4ang-packages-hub")
             credentials {
-                username = System.getenv("GITHUB_ACTOR") ?: project.findProperty("gpr.user") as String?
-                password = System.getenv("GITHUB_TOKEN") ?: project.findProperty("gpr.token") as String?
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
+                password = project.findProperty("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
             }
         }
     }
