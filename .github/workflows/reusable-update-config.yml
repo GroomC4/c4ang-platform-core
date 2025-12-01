@@ -46,8 +46,8 @@ jobs:
           SERVICE_SLUG="${ORIGINAL_SLUG#c4ang-}"
 
           # config/{profile}/customer-service.yaml 경로 사용
-          # profile은 local, prod으로 두개 모두 업데이트한다.
-          for PROFILE in local prod; do
+          # profile은 dev, prod으로 두개 모두 업데이트한다.
+          for PROFILE in dev prod; do
             VALUES_FILE="config/${PROFILE}/${SERVICE_SLUG}.yaml"
             echo "Updating file: $VALUES_FILE with tag: ${{ inputs.image_tag }}"
             # yq를 사용하여 'image.tag' 필드 업데이트
