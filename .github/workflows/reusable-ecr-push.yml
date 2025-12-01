@@ -11,27 +11,24 @@ on:
     outputs: # 메인 워크플로우(CI.yml)로 전달할 최종 Output
       image_tag:
         description: 'The tag of the built Docker image (e.g., v1.0.0)'
-        value: ${{ jobs.build-and-push.outputs.tag_name }} # job output인 tag_name을 참조
+        value: ${{ jobs.create-manifest.outputs.tag_name }}
 
 jobs:
-  build-and-push:
-    name: Build and Push to ECR
+  # 공통 준비 작업: ECR 로그인 및 메타데이터 추출
+  prepare:
+    name: Prepare Build
     runs-on: ubuntu-latest
-
-    outputs: # Job 내부에서 외부로 전달할 Output 정의
+    outputs:
+      ecr_registry: ${{ steps.login-ecr.outputs.registry }}
+      ecr_repository: ${{ steps.ecr-name.outputs.ecr_repository }}
       tag_name: ${{ steps.meta.outputs.tag_name }}
+      image_base: ${{ steps.meta.outputs.image_base }}
 
     permissions:
       id-token: write
       contents: read
 
     steps:
-      - name: Checkout service repository
-        uses: actions/checkout@v4
-        with:
-          submodules: ${{ inputs.use_submodules && 'recursive' || 'false' }}
-          path: service
-
       - name: Checkout platform core repository
         uses: actions/checkout@v4
         with:
@@ -56,57 +53,178 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Extract metadata for Docker
+      - name: Extract metadata
         id: meta
         run: |
           TAG_NAME=${{ github.ref_name }}
+          IMAGE_BASE="${{ steps.login-ecr.outputs.registry }}/${{ steps.ecr-name.outputs.ecr_repository }}"
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "image_base=${IMAGE_BASE}" >> $GITHUB_OUTPUT
 
-          # Generate single tag with version name
-          TAGS="${{ steps.login-ecr.outputs.registry }}/${{ steps.ecr-name.outputs.ecr_repository }}:${TAG_NAME}"
+  # AMD64 빌드 (ubuntu-latest = amd64 네이티브)
+  build-amd64:
+    name: Build AMD64
+    needs: prepare
+    runs-on: ubuntu-latest
 
-          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
-          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT # tag_name을 step output으로 설정
+    permissions:
+      id-token: write
+      contents: read
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+    steps:
+      - name: Checkout service repository
+        uses: actions/checkout@v4
+        with:
+          submodules: ${{ inputs.use_submodules && 'recursive' || 'false' }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Pre-build JAR with Gradle
+        run: |
+          chmod +x gradlew
+          ./gradlew bootJar -x test
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
+      - name: Build and push AMD64 image
         uses: docker/build-push-action@v5
         with:
-          context: ./service
-          file: ./service/Dockerfile
+          context: .
+          file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ needs.prepare.outputs.image_base }}:${{ needs.prepare.outputs.tag_name }}-amd64
           build-args: |
-            GITHUB_ACTOR=${{ github.actor }}
-            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
+            JAR_FILE=build/libs/*.jar
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,mode=max,scope=amd64
+          platforms: linux/amd64
+          provenance: false
 
-      - name: Output image details
+  # ARM64 빌드 (ubuntu-24.04-arm = arm64 네이티브)
+  build-arm64:
+    name: Build ARM64
+    needs: prepare
+    runs-on: ubuntu-24.04-arm
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout service repository
+        uses: actions/checkout@v4
+        with:
+          submodules: ${{ inputs.use_submodules && 'recursive' || 'false' }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Pre-build JAR with Gradle
         run: |
-          echo "🚀 Docker image pushed successfully!"
-          echo "Repository: ${{ steps.ecr-name.outputs.ecr_repository }}"
-          echo "Tag: ${{ steps.meta.outputs.tag_name }}"
-          echo "Image: ${{ steps.meta.outputs.tags }}"
+          chmod +x gradlew
+          ./gradlew bootJar -x test
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push ARM64 image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ needs.prepare.outputs.image_base }}:${{ needs.prepare.outputs.tag_name }}-arm64
+          build-args: |
+            JAR_FILE=build/libs/*.jar
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,mode=max,scope=arm64
+          platforms: linux/arm64
+          provenance: false
+
+  # 멀티 아키텍처 manifest 생성
+  create-manifest:
+    name: Create Multi-arch Manifest
+    needs: [prepare, build-amd64, build-arm64]
+    runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ needs.prepare.outputs.tag_name }}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create and push manifest
+        run: |
+          IMAGE_BASE="${{ needs.prepare.outputs.image_base }}"
+          TAG="${{ needs.prepare.outputs.tag_name }}"
+
+          # manifest 생성 및 푸시
+          docker manifest create ${IMAGE_BASE}:${TAG} \
+            ${IMAGE_BASE}:${TAG}-amd64 \
+            ${IMAGE_BASE}:${TAG}-arm64
+
+          docker manifest push ${IMAGE_BASE}:${TAG}
+
+          echo "🚀 Multi-arch Docker image pushed successfully!"
+          echo "Repository: ${{ needs.prepare.outputs.ecr_repository }}"
+          echo "Tag: ${TAG}"
+          echo "Image: ${IMAGE_BASE}:${TAG}"
 
   call-update-config:
     name: Trigger CD (Call Update Config)
-    needs: build-and-push # 1번 Job(build-and-push)이 성공해야 실행
+    needs: create-manifest
 
     permissions:
       contents: write # c4ang-infra에 커밋할 권한
 
     secrets: inherit # GROOM_GITHUB_ACTION_TOKEN 전달
 
-    # 1번 Job이 끝난 후, 2번 Job은 reusable-update-config.yml을 호출
-    uses: GroomC4/c4ang-platform-core/.github/workflows/reusable-update-config.yml@v1.2.9
+    uses: GroomC4/c4ang-platform-core/.github/workflows/reusable-update-config.yml@main
     with:
-      # 1번 Job(build-and-push)의 결과(outputs)를 전달
       service_slug: "${{ github.event.repository.name }}"
-      image_tag: ${{ needs.build-and-push.outputs.tag_name }}
+      image_tag: ${{ needs.create-manifest.outputs.tag_name }}
       infra_repo_name: 'GroomC4/c4ang-infra'
