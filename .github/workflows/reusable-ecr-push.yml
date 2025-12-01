@@ -111,8 +111,6 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ${{ needs.prepare.outputs.image_base }}:${{ needs.prepare.outputs.tag_name }}-amd64
-          build-args: |
-            JAR_FILE=build/libs/*.jar
           cache-from: type=gha,scope=amd64
           cache-to: type=gha,mode=max,scope=amd64
           platforms: linux/amd64
@@ -168,8 +166,6 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ${{ needs.prepare.outputs.image_base }}:${{ needs.prepare.outputs.tag_name }}-arm64
-          build-args: |
-            JAR_FILE=build/libs/*.jar
           cache-from: type=gha,scope=arm64
           cache-to: type=gha,mode=max,scope=arm64
           platforms: linux/arm64
