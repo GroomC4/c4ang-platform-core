@@ -45,13 +45,14 @@ jobs:
           ORIGINAL_SLUG="${{ inputs.service_slug }}"
           SERVICE_SLUG="${ORIGINAL_SLUG#c4ang-}"
 
-          # helm/services/customer-service/values.yaml 경로 사용
-          VALUES_FILE="helm/services/$SERVICE_SLUG/values.yaml"
-
-          echo "Updating file: $VALUES_FILE with tag: ${{ inputs.image_tag }}"
-
-          # yq를 사용하여 'image.tag' 필드 업데이트
-          yq -i '.image.tag = env(NEW_TAG)' "$VALUES_FILE"
+          # config/{profile}/customer-service.yaml 경로 사용
+          # profile은 local, prod으로 두개 모두 업데이트한다.
+          for PROFILE in local prod; do
+            VALUES_FILE="config/${PROFILE}/${SERVICE_SLUG}.yaml"
+            echo "Updating file: $VALUES_FILE with tag: ${{ inputs.image_tag }}"
+            # yq를 사용하여 'image.tag' 필드 업데이트
+            yq -i '.image.tag = env(NEW_TAG)' "$VALUES_FILE"
+          done
 
 
       - name: Commit and Push changes
