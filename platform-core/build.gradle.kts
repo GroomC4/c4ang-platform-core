@@ -1,4 +1,7 @@
 dependencies {
+    // Platform Common (공통 클래스: DataSourceType, DynamicRoutingDataSource)
+    api(project(":platform-common"))
+
     // Spring Boot
     api("org.springframework.boot:spring-boot-starter-data-jpa:3.3.4")
     api("org.springframework.boot:spring-boot-starter-jdbc:3.3.4")

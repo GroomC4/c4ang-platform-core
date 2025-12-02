@@ -13,10 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
-import org.springframework.data.redis.connection.RedisConnectionFactory
-import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy
-import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.PostgreSQLContainer
 import javax.sql.DataSource
 
@@ -31,7 +28,9 @@ import javax.sql.DataSource
  * - replicaDataSource: Replica PostgreSQL (또는 Primary와 동일)
  * - routingDataSource: @Transactional(readOnly) 기반 라우팅
  * - dataSource: LazyConnectionDataSourceProxy
- * - redisConnectionFactory: Redis 연결
+ *
+ * **Note:** Redis ConnectionFactory는 TestContainerContextInitializer에서 프로퍼티 주입 후
+ * platform-core의 RedisConfiguration에서 생성됩니다.
  *
  * **사용법:**
  * ```kotlin
@@ -140,20 +139,4 @@ class TestDataSourceAutoConfiguration {
     fun dataSource(
         @Qualifier("routingDataSource") routingDataSource: DataSource,
     ): DataSource = LazyConnectionDataSourceProxy(routingDataSource)
-
-    /**
-     * Redis ConnectionFactory
-     */
-    @Bean
-    @ConditionalOnBean(name = ["redisContainer"])
-    @ConditionalOnProperty(prefix = "testcontainers.redis", name = ["enabled"], matchIfMissing = true)
-    fun redisConnectionFactory(
-        @Qualifier("redisContainer") redisContainer: GenericContainer<*>,
-    ): RedisConnectionFactory {
-        val factory = LettuceConnectionFactory(redisContainer.host, redisContainer.getMappedPort(6379))
-        factory.afterPropertiesSet()
-
-        println("✅ Redis ConnectionFactory configured: ${redisContainer.host}:${redisContainer.getMappedPort(6379)}")
-        return factory
-    }
 }

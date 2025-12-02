@@ -1,7 +1,6 @@
 dependencies {
-    // Platform Core (새 통합 모듈)
-    // DynamicRoutingDataSource, DataSourceType 클래스 사용
-    api(project(":platform-core"))
+    // Platform Common (공통 클래스: DataSourceType, DynamicRoutingDataSource)
+    api(project(":platform-common"))
 
     // Spring Boot
     api("org.springframework.boot:spring-boot-starter-data-jpa:3.3.4")

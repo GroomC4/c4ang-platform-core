@@ -5,6 +5,7 @@ on:
     tags:
       - 'v*'
     paths:
+      - 'platform-common/**'
       - 'platform-core/**'
       - 'testcontainers-starter/**'
       - 'build.gradle.kts'
@@ -49,7 +50,8 @@ jobs:
         run: ./gradlew clean build -Pversion=${{ steps.version.outputs.version }}
 
       - name: Publish to GitHub Packages
-        run: ./gradlew publish -Pversion=${{ steps.version.outputs.version }}
+        # platform-common은 내부 전용 모듈이므로 배포하지 않음
+        run: ./gradlew :platform-core:publish :testcontainers-starter:publish -Pversion=${{ steps.version.outputs.version }}
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GROOM_GITHUB_ACTION_TOKEN }}

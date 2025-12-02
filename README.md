@@ -13,9 +13,12 @@ Spring Boot 기반 마이크로서비스를 위한 공통 플랫폼 라이브러
 
 ```
 c4ang-platform-core/
+├── platform-common/         # 공통 모듈 (DataSourceType, DynamicRoutingDataSource)
 ├── platform-core/           # 메인 모듈 (DataSource, Local 환경)
 └── testcontainers-starter/  # 테스트용 모듈 (Testcontainers)
 ```
+
+> `platform-common`은 내부 전용 모듈로, 외부에 배포되지 않습니다.
 
 ## 빠른 시작
 
@@ -102,7 +105,36 @@ platform:
         enabled: true               # Schema Registry 활성화 (기본: true)
 ```
 
-#### Production 환경 (application-prod.yml)
+#### Dev 환경 (application-dev.yml) - k3d
+
+Dev 프로필은 k3d(로컬 Kubernetes) 환경에서 사용됩니다.
+Production과 동일한 구조이지만, k3d 클러스터 내부 서비스를 참조합니다.
+
+```yaml
+# application-dev.yml
+spring:
+  datasource:
+    master:
+      url: jdbc:postgresql://postgres-primary.database:5432/mydb
+      username: ${DB_USERNAME}
+      password: ${DB_PASSWORD}
+    replica:
+      url: jdbc:postgresql://postgres-replica.database:5432/mydb
+      username: ${DB_USERNAME}
+      password: ${DB_PASSWORD}
+
+  data:
+    redis:
+      host: redis.cache
+      port: 6379
+
+  kafka:
+    bootstrap-servers: kafka.messaging:9092
+    properties:
+      schema.registry.url: http://schema-registry.messaging:8081
+```
+
+#### Production 환경 (application-prod.yml) - EKS
 
 ```yaml
 # application-prod.yml
@@ -134,7 +166,10 @@ spring:
 # Local 개발 (Docker Compose 자동 시작)
 ./gradlew bootRun --args='--spring.profiles.active=local'
 
-# Production
+# Dev (k3d)
+./gradlew bootRun --args='--spring.profiles.active=dev'
+
+# Production (EKS)
 ./gradlew bootRun --args='--spring.profiles.active=prod'
 ```
 
