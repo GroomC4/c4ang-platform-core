@@ -16,9 +16,11 @@ import org.springframework.context.ConfigurableApplicationContext
  * **주요 역할:**
  * - 테스트 프로파일 활성화 확인
  * - Testcontainers 시작 및 동적 프로퍼티 주입
- * - Kafka, Schema Registry URL 주입
+ * - Redis, Kafka, Schema Registry URL 주입
  *
  * **주입되는 프로퍼티:**
+ * - spring.data.redis.host (Redis 활성화 시)
+ * - spring.data.redis.port (Redis 활성화 시)
  * - spring.kafka.bootstrap-servers (Kafka 활성화 시)
  * - spring.kafka.properties.schema.registry.url (Schema Registry 활성화 시)
  *
@@ -66,6 +68,20 @@ class TestContainerContextInitializer : ApplicationContextInitializer<Configurab
         }
 
         val dynamicProperties = mutableListOf<String>()
+
+        // Redis 프로퍼티 주입
+        if (properties.redis.enabled) {
+            try {
+                val redis = SharedContainers.redisContainer
+                val redisHost = redis.host
+                val redisPort = redis.getMappedPort(6379)
+                dynamicProperties.add("spring.data.redis.host=$redisHost")
+                dynamicProperties.add("spring.data.redis.port=$redisPort")
+                println("✅ Redis: $redisHost:$redisPort")
+            } catch (e: Exception) {
+                println("⚠️  Failed to start Redis container: ${e.message}")
+            }
+        }
 
         // Kafka 프로퍼티 주입
         if (properties.kafka.enabled) {
