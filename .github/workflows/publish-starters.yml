@@ -60,6 +60,7 @@ jobs:
         with:
           name: build-artifacts
           path: |
+            platform-common/build/libs/
             platform-core/build/libs/
             testcontainers-starter/build/libs/
           retention-days: 7
