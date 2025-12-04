@@ -167,8 +167,12 @@ class LocalInfraEnvironmentPostProcessor : EnvironmentPostProcessor {
         // Redis
         if (properties.infrastructure.redis.enabled) {
             val redisPort = manager.getServicePort("redis", 6379)
+            // Spring Data Redis
             props["spring.data.redis.host"] = "localhost"
             props["spring.data.redis.port"] = redisPort
+            // Legacy Spring Redis (Redisson 등에서 사용)
+            props["spring.redis.host"] = "localhost"
+            props["spring.redis.port"] = redisPort
         }
 
         // Kafka (고정 포트 사용 - advertised.listeners 문제로 동적 포트 불가)
