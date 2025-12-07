@@ -35,6 +35,9 @@ case "$REPO_NAME" in
    "c4ang-store-service")
      ECR_REPOSITORY="c4ang-store-service"
      ;;
+   "c4ang-saga-tracker")
+     ECR_REPOSITORY="c4ang-saga-tracker"
+     ;;
   *)
     # Default: use repository name as-is
     ECR_REPOSITORY="$REPO_NAME"

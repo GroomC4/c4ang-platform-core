@@ -21,6 +21,9 @@ dependencies {
     // Kafka (optional)
     compileOnly("org.springframework.kafka:spring-kafka:3.3.0")
 
+    // Jackson for JSON serialization (for SagaTrackerClient)
+    compileOnly("com.fasterxml.jackson.core:jackson-databind")
+
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test:3.3.4")
     testRuntimeOnly("com.h2database:h2")
